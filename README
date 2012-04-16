@@ -1,13 +1,95 @@
 # explore_overtone
 
-FIXME: write description
+Just exploring overtone and taking some notes.  Mainly for me to be
+able to come back & figure this out if I ever get distracted by other
+things.
 
 ## Usage
 
-FIXME: write
+Use at your own risk.
 
 ## License
 
-Copyright (C) 2012 FIXME
+Copyright (C) 2012 Roger Allen.
 
 Distributed under the Eclipse Public License, the same as Clojure.
+
+But, I might change that once I figure out what I'm doing here.
+
+# How I got here
+
+Started at http://overtone.github.com/ and it pointed me to the wiki
+for Documentation.  Starting there, it really wasn't obvious that I
+didn't need to get Clojure first.  But, the main github overtone
+README.md has what I needed to do:
+
+1. get lein from http://github.com/technomancy/leiningen
+   
+    make executable & get on your path, then
+    $ lein
+
+2. use lein to get all the bits you need for the tutorial
+
+    $ lein new explore_overtone
+    $ cd explore_overtone
+    $ lein deps
+
+3. bring up the repl
+    $ lein repl
+    ...
+    (System/exit 0)
+
+4. but, I wasn't satisfied with that...need Emacs.
+
+    https://github.com/overtone/overtone/wiki/Overtone-in-Emacs
+      add swank-clojure
+      https://github.com/technomancy/swank-clojure
+        add clojure-mode.el
+        http://github.com/technomancy/clojure-mode
+      got live-coding-emacs config
+        $ git clone https://github.com/overtone/live-coding-emacs.git
+        $ mv .emacs.d/ .emacs.d.old
+        $ cp -R .../live-coding-emacs .emacs.d
+
+Startup in emacs
+
+Option 1:
+  $ cd .../explore_overtone
+  $ lein swank
+
+  In emacs
+  ;; initially wasn't able to get this to work...
+  ;; oh, see "connecting with slime" in the swank-clojure page, 
+  M-x slime-connect
+  (use 'overtone.live)
+  ...
+  (System/exit 0)
+
+Option 2:
+  In emacs
+  go to explore_overtone dir in dired
+  M-x clojure-jack-in
+  (use 'overtone.live)
+  ...
+  (System/exit 0)
+
+# Questions...
+
+For questions that can be answered with code, see src/explore_overtone/qna.clj
+
+* where to understand the basics of Clojure?
+
+  http://dev.clojure.org/display/doc/Getting+Started+for+Beginners
+
+* where to understand the basics of emacs+clojure/slime-mode?
+
+  http://dev.clojure.org/display/doc/Getting+Started+with+Emacs
+  http://www.cliki.net/SLIME%20Features
+
+* how do I eval code from another buffer into the repl buffer?
+
+  C-x C-e evaluates & prints out the results into the message area.
+  Nothing happens in the repl buffer, but the evaluation does happen.
+
+  M-x slime-eval-region
+
