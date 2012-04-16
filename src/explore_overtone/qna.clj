@@ -25,7 +25,16 @@
 ;; ......................................................................
 ;; * how do I load/use other files containing code? 
 ;; ......................................................................
+;; * how to play a simple sine wave?
+
+;; 3 seconds of a 300 Hz sine wave
+(demo 3 (sin-osc 300))
+
+;; ......................................................................
 ;; * how to connect to OSC ipad or android controllers
+
+;; get http://hexler.net/software/touchosc for ipad/android + bridge
+;; bridge app doesn't show any gui.
 
 (midi-in) ; brings up a dialog, but it can 'pop under' so look for it
 
