@@ -1,0 +1,12 @@
+* Clojure 
+
+Notes about Clojure.  Potentially for a cheat sheet.
+
+* variables
+* functions
+* control statements
+** if then else
+  user> (if true 1.0 0.0)
+  1.0
+  user> (if false 1.0 0.0)
+  0.0

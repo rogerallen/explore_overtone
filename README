@@ -98,10 +98,3 @@ I'll write down questions as I think of them.  Answers as I get to them.
 
   M-x slime-eval-region
 
-# Clojure Quickies
-
-* if then else
-  user> (if true 1.0 0.0)
-  1.0
-  user> (if false 1.0 0.0)
-  0.0
