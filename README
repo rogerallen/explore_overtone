@@ -20,8 +20,11 @@ But, I might change that once I figure out what I'm doing here.
 
 Started at http://overtone.github.com/ and it pointed me to the wiki
 for Documentation.  Starting there, it really wasn't obvious that I
-didn't need to get Clojure first.  But, the main github overtone
-README.md has what I needed to do:
+didn't need to get Clojure and also the clone the overtone git
+repository first.  Turns out, neither of those were necessary, but it
+wasn't clear since instructions were scattered across several pages.
+After the fact, I noticed that the main github overtone README.md
+has what I needed to do:
 
 1. get lein from http://github.com/technomancy/leiningen
    
