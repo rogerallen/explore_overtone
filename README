@@ -73,9 +73,11 @@ Option 2:
   ...
   (System/exit 0)
 
-# Questions...
+# Questions & Answers
 
-For questions that can be answered with code, see src/explore_overtone/qna.clj
+Q & A about the environment below.  For questions that can be answered with code, see https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/qna.clj
+
+I'll write down questions as I think of them.  Answers as I get to them.
 
 * where to understand the basics of Clojure?
 
@@ -93,3 +95,10 @@ For questions that can be answered with code, see src/explore_overtone/qna.clj
 
   M-x slime-eval-region
 
+# Clojure Quickies
+
+* if then else
+  user> (if true 1.0 0.0)
+  1.0
+  user> (if false 1.0 0.0)
+  0.0
