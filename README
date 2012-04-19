@@ -44,6 +44,8 @@ has what I needed to do:
 
 4. but, I wasn't satisfied with that...need Emacs.
 
+   [Note this older video http://vimeo.com/25190186]
+
     https://github.com/overtone/overtone/wiki/Overtone-in-Emacs
       add swank-clojure
       https://github.com/technomancy/swank-clojure
@@ -98,3 +100,7 @@ I'll write down questions as I think of them.  Answers as I get to them.
 
   M-x slime-eval-region
 
+* Check into Impromptu?
+
+  Found this http://impromptu.moso.com.au/tutorials.html 
+  Useful?
