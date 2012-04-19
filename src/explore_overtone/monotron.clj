@@ -10,6 +10,9 @@
 ;; http://www.soundonsound.com/sos/aug10/articles/korg-monotron.htm
 ;; following patterns from
 ;; https://github.com/overtone/overtone/blob/master/src/overtone/inst/synth.clj
+;;
+;; found filter discussion here
+;; http://www.timstinchcombe.co.uk/index.php?pge=mono
 
 ;; ----------------------------------------------------------------------
 (use 'overtone.live)
@@ -31,28 +34,34 @@
         LFO             (* int (saw rate))
         VCO             (saw (+ note_freq pitch (* pitch_mod_coef LFO)))
         vcf_freq        (+ cutoff (* cutoff_mod_coef LFO) note_freq)
-        vcf_bpf_q       0.1 ; reciprocal! of Q (no idea if this is right)
-        VCF             (+ (* (- 1 peak) (lpf VCO vcf_freq))
-                           (* peak (bpf VCO vcf_freq vcf_bpf_q)))]
+        ;; from web vcf reciprocal of Q looks 1-ish
+        vcf_bpf_rq       1.0
+        ;; from web vcf looks like you should always have a large LPF component
+        ;; BPF should get added on top.  Seems like I should scale this to clamp
+        ;; the output, though.
+        vcf_lpf         (lpf VCO vcf_freq)
+        vcf_bpf         (bpf VCO vcf_freq vcf_bpf_rq)
+        VCF             (/ (+ vcf_lpf (* peak vcf_bpf)) (+ 1 peak))
+        ]
     (* gate volume VCF)))
 
 ;; create some instances of the synth
 (do
-  (def N0 (monotron 72 0.8 0 0.0 2.5 350.0 800.0 0.8 1.0))
-  (def N1 (monotron 76 0.8 0 0.0 2.5 350.0 800.0 0.8 1.0))
-  (def N2 (monotron 79 0.8 0 0.0 2.5 350.0 800.0 0.8 1.0)))
+  (def N0 (monotron 72 0.8 1 0.0 2.5 350.0 800.0 0.8 1.0))
+  (def N1 (monotron 76 0.8 1 0.0 2.5 350.0 800.0 0.8 1.0))
+  (def N2 (monotron 79 0.8 1 0.0 2.5 350.0 800.0 0.8 1.0)))
 
 ;; edit & C-x C-e on any these to play around
 (ctl monotron :note   70)
-(ctl N0 :note   30)
-(ctl N1 :note   (+ 30 4))
+(ctl N0 :note   60)
+(ctl N1 :note   64)
 (ctl N2 :note   (+ 30 7))
-(ctl monotron :volume 0.8)
+(ctl monotron :volume 0.5)
 (ctl monotron :mod_pitch_not_cutoff 1)
 (ctl monotron :pitch  0.0)
-(ctl monotron :rate   2)
-(ctl monotron :int    0.0)
-(ctl monotron :cutoff 880.0)
+(ctl monotron :rate   0.5)
+(ctl monotron :int    500.0)
+(ctl monotron :cutoff 380.0)
 (ctl monotron :peak   0.0)
 (ctl monotron :gate   1.0)
 
@@ -68,7 +77,7 @@
   (ctl N1 :note   (+ note 4))
   (ctl N2 :note   (+ note 7)))
 
-(maj-tri 44)
+(maj-tri 59)
 
 ;; MIDI Control ==================================================
 ;; hooking up to the iPad
