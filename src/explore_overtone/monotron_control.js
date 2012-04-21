@@ -1,3 +1,4 @@
+// Interface for http://charlie-roberts.com/Control/
 loadedInterfaceName = "monotron";
 
 interfaceOrientation = "landscape";
@@ -25,29 +26,46 @@ pages = [[
     "label": "menu",
 },
 
+// Title Lable
 {
     "name": "title",
     "type": "Label",
     "x": 0, "y": 0,
     "width": 1, "height": 0.1,
-    "value": "monotron",
+    "value": "monotron-alike",
     "align": "left",
+},
+
+// Volume knob
+{
+    "name": "volume_label",
+    "type": "Label",
+    "x": 0.5, "y": 0.0,
+    "width": 0.1, "height": 0.05,
+    "value": "volume",
+},
+{
+    "name":"volume",
+    "type":"Knob",
+    "x":     0.5, "y":      0.0,
+    "width": 0.1,  "height": 0.1,
+    "midiNumber" : 7,
 },
 
 // Panel includes: (from left-to-right)
 // standby/pitch/cutoff 3-pos-switch
 {
-     "name" : "standby_button",
-     "type" : "Button",
-     "x" : 0.04, "y" : 0.24,
-     "width" : .08, "height" : .08,
+    "name" : "standby_button",
+    "type" : "Button",
+    "x" : 0.04, "y" : 0.24,
+    "width" : .08, "height" : .08,
     "label" : "standby",
 },
 {
-     "name" : "pitch_button",
-     "type" : "Button",
-     "x" : 0.04, "y" : 0.32,
-     "width" : .08, "height" : .08,
+    "name" : "pitch_button",
+    "type" : "Button",
+    "x" : 0.04, "y" : 0.32,
+    "width" : .08, "height" : .08,
     "label" : "pitch",
 },
 {
@@ -72,6 +90,7 @@ pages = [[
     "type":"Knob",
     "x":     0.167, "y":      0.3,
     "width": 0.15,  "height": 0.15,
+    "midiNumber" : 0,
 },
 
 // LFO rate knob
@@ -87,6 +106,7 @@ pages = [[
     "type":"Knob",
     "x":     0.333, "y":      0.3,
     "width": 0.15,  "height": 0.15,
+    "midiNumber" : 4,
 },
 
 // LFO int(ensity) knob
@@ -102,6 +122,7 @@ pages = [[
     "type":"Knob",
     "x":     0.5, "y":      0.3,
     "width": 0.15,  "height": 0.15,
+    "midiNumber" : 3,
 },
 
 // VCF cutoff
@@ -117,6 +138,7 @@ pages = [[
     "type":"Knob",
     "x":     0.667, "y":      0.3,
     "width": 0.15,  "height": 0.15,
+    "midiNumber" : 1,
 },
 
 // VCF peak
@@ -132,9 +154,8 @@ pages = [[
     "type":"Knob",
     "x":     0.833, "y":      0.3,
     "width": 0.15,  "height": 0.15,
+    "midiNumber" : 2,
 },
-
-
 
 // "Keyboard"
 {
@@ -148,7 +169,7 @@ pages = [[
     "stroke": "#aaaaaa",
     "mode": "momentary",
     "midiType": "cc",
-    "midiNumber": 1,
+    "midiNumber": 5,
     "maxTouches": 1,
     "isMomentary": false,
     "requiresTouchDown": false,

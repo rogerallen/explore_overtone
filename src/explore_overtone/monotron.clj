@@ -85,14 +85,22 @@
 ;; simple listener just for testing
 (defn midi-listener [event ts]
   (println "listener: " event))
+
 (midi-handle-events kb #'midi-listener)
 
 ;; 'real' listener
 ;; hook up Control to the ctl messages
-;; use "Mixer - Landscape" layout
+;; use monotron_control.js layout
+;; FIXME use konstants for controller #s to allow for switching.
 (defn midi-listener [event ts]
   ;;(println "listener: " event)
   (cond
+
+   ;; controller 0 is for PITCH
+   (and (== 176 (:cmd event)) (== 0 (:note event)))
+   (let [v (midi->hz ( / (:vel event) 1.0))]
+     (println "pitch" v)
+     (ctl monotron :cutoff v))
 
    ;; controller 1 is for CUTOFF
    (and (== 176 (:cmd event)) (== 1 (:note event)))
@@ -118,14 +126,14 @@
      (println "rate" v)
      (ctl monotron :rate v))
 
-   ;; controller 5 is for NOTE
+   ;; controller 5 is for NOTE.  Make it one octave
    (and (== 176 (:cmd event)) (== 5 (:note event)))
-   (let [v ( * 1 (:vel event))]
+   (let [v (+ 50 (* 12 (/ (:vel event) 127.0)))]
      (println "note" v)
      (ctl monotron :note v))
 
-   ;; controller 6 is for VOLUME
-   (and (== 176 (:cmd event)) (== 6 (:note event)))
+   ;; controller 7 is for VOLUME
+   (and (== 176 (:cmd event)) (== 7 (:note event)))
    (let [v ( / (:vel event) 127.0)]
      (println "volume" v)
      (ctl monotron :volume v))
