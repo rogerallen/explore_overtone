@@ -63,7 +63,7 @@
 (ctl monotron :int    500.0)
 (ctl monotron :cutoff 380.0)
 (ctl monotron :peak   0.0)
-(ctl monotron :gate   1.0)
+(ctl monotron :gate   0.0)
 
 ;; for when you're done
 (kill monotron)
@@ -80,86 +80,105 @@
 (maj-tri 59)
 
 ;; MIDI Control ==================================================
-;; hooking up to the iPad using the Control (OSC + Midi) Program.
-;;
-;; This App is disappointing.  I cannot get reliable communication.
-;; It "mostly" works, but it definitely has issues with closely
-;; spaced events.  Sad...
-;;
-(def kb (midi-in "Control Session"))
-;; simple listener just for testing
-(defn midi-listener [event ts]
-  (println "listener: " event))
+;; (do 
+;;   (def kb (midi-in "Control Session"))
+;;   (defn midi-listener [event ts]
+;;     (println "midi: " event))
+;;   (midi-handle-events kb #'midi-listener))
+;; okay now for reals...
+(do
+  (def kb (midi-in "Control Session")) ; FIXME
 
-(midi-handle-events kb #'midi-listener)
+  ;; wow functional programming makes state-handling odd.
+  (def threePosState (ref 0))
+  (defn nextThreePosState []
+    (dosync (ref-set threePosState (mod (+ 1 @threePosState) 3))))
 
-;; 'real' listener
-;; hook up Control to the ctl messages
-;; use monotron_control.js layout
-;; FIXME use konstants for controller #s to allow for switching.
-(defn midi-listener [event ts]
-  (println "listener: " event)
-  (cond
+  (defn eventMatch
+    "event :cmd matches cmd and :data1 matches data1"
+    [ event cmd data1 ]
+    (and (== cmd (:cmd event)) (== data1 (:data1 event))))
 
-   ;; controller 0 is for PITCH
-   (and (== 176 (:cmd event)) (== 0 (:note event)))
-   (let [v (midi->hz ( / (:vel event) 1.0))]
-     (println "pitch" v)
-     (ctl monotron :cutoff v))
+  ;; switching to "Mix 2" layout in TouchOSC
+  ;; FIXME make custom control
+  (defn midi-listener [event ts]
+    (let [kControlEvent  176
+          kCmdThreePos   144
+          kData1ThreePos  24
+          kData2ThreePos 127
+          kData1Pitch      7
+          kData1Rate       8
+          kData1Int        9
+          kData1Cutoff     1
+          kData1Peak       2
+          kData1Volume     0
+          kData1Note      47
+          ThreePosState    0]
+      ;;(println "listener: " event)
+      (cond
 
-   ;; controller 1 is for CUTOFF
-   (and (== 176 (:cmd event)) (== 1 (:note event)))
-   (let [v ( * 30 (:vel event))]
-     (println "cutoff" v)
-     (ctl monotron :cutoff v))
+        (eventMatch event kControlEvent kData1Volume)
+        (let [v ( / (:vel event) 127.0)]
+          (println "volume" v)
+          (ctl monotron :volume v))
 
-   ;; controller 2 is for PEAK
-   (and (== 176 (:cmd event)) (== 2 (:note event)))
-   (let [v ( / (:vel event) 127.0)]
-     (println "peak" v)
-     (ctl monotron :peak v))
+        (eventMatch event kControlEvent kData1Pitch)
+        (let [v (midi->hz ( / (:vel event) 1.0))]
+          (println "pitch" v)
+          (ctl monotron :cutoff v))
+
+        (eventMatch event kControlEvent kData1Cutoff)
+        (let [v ( * 30 (:vel event))]
+          (println "cutoff" v)
+          (ctl monotron :cutoff v))
+      
+        (eventMatch event kControlEvent kData1Peak)
+        (let [v ( / (:vel event) 127.0)]
+          (println "peak" v)
+          (ctl monotron :peak v))
   
-   ;; controller 3 is for INT
-   (and (== 176 (:cmd event)) (== 3 (:note event)))
-   (let [v ( * 20 (:vel event))]
-     (println "int" v)
-     (ctl monotron :int v))
+        (eventMatch event kControlEvent kData1Int)
+        (let [v ( * 20 (:vel event))]
+          (println "int" v)
+          (ctl monotron :int v))
 
-   ;; controller 4 is for RATE
-   (and (== 176 (:cmd event)) (== 4 (:note event)))
-   (let [v ( * 0.25 (:vel event))]
-     (println "rate" v)
-     (ctl monotron :rate v))
+        (eventMatch event kControlEvent kData1Rate)
+        (let [v ( * 0.25 (:vel event))]
+          (println "rate" v)
+          (ctl monotron :rate v))
 
-   ;; controller 5 is for NOTE.  Make it one octave
-   (and (== 176 (:cmd event)) (== 5 (:note event)))
-   (let [v (+ 50 (* 12 (/ (:vel event) 127.0)))]
-     (println "note" v)
-     (ctl monotron :note v))
+        ;; one octave for now
+        (eventMatch event kControlEvent kData1Note)
+        (let [v (+ 50 (* 12 (/ (:vel event) 127.0)))]
+          (println "note" v)
+          (ctl monotron :note v))
 
-   ;; controller 7 is for VOLUME
-   (and (== 176 (:cmd event)) (== 7 (:note event)))
-   (let [v ( / (:vel event) 127.0)]
-     (println "volume" v)
-     (ctl monotron :volume v))
+        ;; switch toggles through standby/pitch_mod/cutoff_mod
+        (and (eventMatch event kCmdThreePos kData1ThreePos)
+             (= kData2ThreePos (:data2 event)))
+        (do
+          (nextThreePosState)
+          (cond
+            
+            (= 0 @threePosState)
+            (do
+              (println "standby")
+              (ctl monotron :gate 0.0))
 
-   ;; controller 10 is for standby/pitch_mod/cutoff_mod
-   (and (== 176 (:cmd event)) (== 10 (:note event)) (== 0 (:vel event)))
-   (let []
-     (println "standby")
-     (ctl monotron :gate 0.0))
-   ;; ...pitch_mod
-   (and (== 176 (:cmd event)) (== 10 (:note event)) (== 1 (:vel event)))
-   (let []
-     (println "pitch_mod")
-     (ctl monotron :gate 1.0)
-     (ctl monotron :mod_pitch_not_cutoff 1))
-   ;; ...cutoff_mod
-   (and (== 176 (:cmd event)) (== 10 (:note event)) (== 2 (:vel event)))
-   (let []
-     (println "cutoff_mod")
-     (ctl monotron :gate 1.0)
-     (ctl monotron :mod_pitch_not_cutoff 0))
+            ;; ...pitch_mod
+            (= 1 @threePosState)
+            (do
+              (println "pitch_mod")
+            (ctl monotron :gate 1.0)
+            (ctl monotron :mod_pitch_not_cutoff 1))
 
-   )
-  )
+            ;; ...cutoff_mod
+            (= 2 @threePosState)
+            (do
+              (println "cutoff_mod")
+              (ctl monotron :gate 1.0)
+              (ctl monotron :mod_pitch_not_cutoff 0))))
+        
+        )))
+  
+  (midi-handle-events kb #'midi-listener))
