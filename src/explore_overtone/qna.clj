@@ -28,12 +28,25 @@
 ;; ......................................................................
 ;; * how to connect to OSC ipad or android controllers
 
-;; get http://hexler.net/software/touchosc for ipad/android + bridge
-;; bridge app doesn't show any gui, but there is something in the menu bar.
+;; * TouchOSC
+;; 
+;;   http://hexler.net/software/touchosc
 ;;
-;; control also seems to work
-;; http://itunes.apple.com/us/app/control-osc-+-midi/id413224747?mt=8
-;; http://charlie-roberts.com/Control/
+;;   for ipad/android + bridge.  bridge app doesn't show any gui, but
+;;   there is something in the menu bar.  iOS is $5 and has GUI
+;;   creation.  Android is free, but doesn't have GUI stuff yet.
+;;
+;;   Works for me where Control (below) did not.
+;;
+;; * There is also Control (OSC + Midi)
+;; 
+;;   http://itunes.apple.com/us/app/control-osc-+-midi/id413224747?mt=8
+;;   http://charlie-roberts.com/Control/
+;;
+;;   Unfortunately, this App is disappointing.  I cannot get reliable
+;;   communication.  It "mostly" works, but it definitely has issues
+;;   with closely spaced events.  A bit sad because I liked the
+;;   javascript editor.
 
 (midi-in) ; brings up a dialog, but it can 'pop under' so look for it
 

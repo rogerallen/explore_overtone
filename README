@@ -88,6 +88,12 @@ I'll write down questions as I think of them.  Answers as I get to them.
 
   http://dev.clojure.org/display/doc/Getting+Started+for+Beginners
 
+  Nice intro for me:
+  http://moxleystratton.com/clojure/clojure-tutorial-for-the-non-lisp-programmer
+
+  Looks like a nice, more detailed resource:
+  http://java.ociweb.com/mark/clojure/article.html
+
 * where to understand the basics of emacs+clojure/slime-mode?
 
   http://dev.clojure.org/display/doc/Getting+Started+with+Emacs
