@@ -80,7 +80,12 @@
 (maj-tri 59)
 
 ;; MIDI Control ==================================================
-;; hooking up to the iPad
+;; hooking up to the iPad using the Control (OSC + Midi) Program.
+;;
+;; This App is disappointing.  I cannot get reliable communication.
+;; It "mostly" works, but it definitely has issues with closely
+;; spaced events.  Sad...
+;;
 (def kb (midi-in "Control Session"))
 ;; simple listener just for testing
 (defn midi-listener [event ts]
@@ -93,7 +98,7 @@
 ;; use monotron_control.js layout
 ;; FIXME use konstants for controller #s to allow for switching.
 (defn midi-listener [event ts]
-  ;;(println "listener: " event)
+  (println "listener: " event)
   (cond
 
    ;; controller 0 is for PITCH
@@ -137,6 +142,24 @@
    (let [v ( / (:vel event) 127.0)]
      (println "volume" v)
      (ctl monotron :volume v))
+
+   ;; controller 10 is for standby/pitch_mod/cutoff_mod
+   (and (== 176 (:cmd event)) (== 10 (:note event)) (== 0 (:vel event)))
+   (let []
+     (println "standby")
+     (ctl monotron :gate 0.0))
+   ;; ...pitch_mod
+   (and (== 176 (:cmd event)) (== 10 (:note event)) (== 1 (:vel event)))
+   (let []
+     (println "pitch_mod")
+     (ctl monotron :gate 1.0)
+     (ctl monotron :mod_pitch_not_cutoff 1))
+   ;; ...cutoff_mod
+   (and (== 176 (:cmd event)) (== 10 (:note event)) (== 2 (:vel event)))
+   (let []
+     (println "cutoff_mod")
+     (ctl monotron :gate 1.0)
+     (ctl monotron :mod_pitch_not_cutoff 0))
 
    )
   )

@@ -1,7 +1,47 @@
-// Interface for http://charlie-roberts.com/Control/
+// monotron interface for http://charlie-roberts.com/Control/
 loadedInterfaceName = "monotron";
 
 interfaceOrientation = "landscape";
+
+// 3-position switch state & logic.
+// state = 0/1/2 for standbay/pitch/cutoff
+var toggle3pos_state = 0;
+var toggle3pos_dirty = true;
+control.toggle3pos = function(next_state) {
+    //alert('here is: ' + next_state);
+    if(next_state === toggle3pos_state) {
+        // you are pushing the same button again.
+        // keep this on, rather than letting it toggle
+        if(next_state === 0) {
+            standby_button.setValue(127);
+        } else if(next_state === 1) {
+            pitch_button.setValue(127);
+        } else { // cutoff
+            cutoff_button.setValue(127);
+        }
+        // only send if dirty
+        if(toggle3pos_dirty) {
+            midiManager.sendMIDI("cc", 1, 10, toggle3pos_state);
+            toggle3pos_dirty = false;
+        }
+    } else {
+        toggle3pos_state = next_state;
+        if(next_state === 0) {
+            standby_button.setValue(127);
+            pitch_button.setValue(0);
+            cutoff_button.setValue(0);
+        } else if(next_state === 1) {
+            standby_button.setValue(0);
+            pitch_button.setValue(127);
+            cutoff_button.setValue(0);
+        } else { // cutoff
+            standby_button.setValue(0);
+            pitch_button.setValue(0);
+            cutoff_button.setValue(127);
+        }
+        midiManager.sendMIDI("cc", 1, 10, toggle3pos_state);
+    }
+}
 
 pages = [[
 {
@@ -36,7 +76,7 @@ pages = [[
     "align": "left",
 },
 
-// Volume knob
+// Volume knob = CC 7 
 {
     "name": "volume_label",
     "type": "Label",
@@ -54,12 +94,17 @@ pages = [[
 
 // Panel includes: (from left-to-right)
 // standby/pitch/cutoff 3-pos-switch
+// sends "junk" on 9, but real CC will go on 10
+// CC 10 0/1/2 for standbay/pitch/cutoff
 {
     "name" : "standby_button",
     "type" : "Button",
     "x" : 0.04, "y" : 0.24,
     "width" : .08, "height" : .08,
     "label" : "standby",
+    "midiNumber" : 9,
+    "midiStartingValue" : 127,
+    "ontouchstart": "control.toggle3pos(0,this.value)"
 },
 {
     "name" : "pitch_button",
@@ -67,13 +112,17 @@ pages = [[
     "x" : 0.04, "y" : 0.32,
     "width" : .08, "height" : .08,
     "label" : "pitch",
+    "midiNumber" : 9,
+    "ontouchstart": "control.toggle3pos(1,this.value)"
 },
 {
-     "name" : "standby_button",
-     "type" : "Button",
-     "x" : 0.04, "y" : 0.40,
-     "width" : .08, "height" : .08,
+    "name" : "cutoff_button",
+    "type" : "Button",
+    "x" : 0.04, "y" : 0.40,
+    "width" : .08, "height" : .08,
     "label" : "cutoff",
+    "midiNumber" : 9,
+    "ontouchstart": "control.toggle3pos(2,this.value)"
 },
 
 
