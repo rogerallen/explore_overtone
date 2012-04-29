@@ -7,6 +7,27 @@
 
 ;; ......................................................................
 ;; * how do I start the external server
+
+;; download & install SuperCollider from http://supercollider.sourceforge.net/downloads/
+;;  1) main app -- install normally
+;;  2) extra plugins -- apparently on the mac it goes to...
+;;     ~/Library/Application Support/SuperCollider/Extensions/
+(use 'overtone.core)
+(boot-external-server)
+;; ERROR--got this:
+;; Unable to locate a valid scsynth executable on your system. I looked in the following places: ["/Applications/SuperCollider/scsynth"]
+;; add /Applications/SuperCollider/SuperCollider.app/Contents/Resources to PATH
+;; still no dice.  Hmmm...filed https://github.com/overtone/overtone/issues/89
+
+;; try bringing up app first, open "localhost" window.  click boot button...
+;; Welcome to SuperCollider 3.5.1, type cmd-d for help
+;; booting 57110
+(connect-external-server 57110)  ;; YAY this works.
+
+;; Note this for later...  If the server is on a different machine use
+;; (connect-external-server "192.168.1.23" 57110) substituting the
+;; appropriate hostname and port number.
+
 ;; ......................................................................
 ;; * how do I find documentation on 'demo' or anything else
 (odoc demo)
@@ -24,6 +45,8 @@
 ;; ......................................................................
 ;; * how to play a simple sine wave?
 (demo 3 (sin-osc 300)) ; 3 seconds of a 300 Hz sine wave
+
+;; 
 
 ;; ......................................................................
 ;; * how to connect to OSC ipad or android controllers

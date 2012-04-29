@@ -80,7 +80,9 @@ Option 2:
 
 # Questions & Answers
 
-Q & A about the environment below.  For questions that can be answered with code, see https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/qna.clj
+Q & A about the environment below.  For questions that can be answered
+with code, see
+https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/qna.clj
 
 I'll write down questions as I think of them.  Answers as I get to them.
 
@@ -106,7 +108,17 @@ I'll write down questions as I think of them.  Answers as I get to them.
 
   M-x slime-eval-region
 
-* Check into Impromptu?
+* how do I get a standalone SuperCollider for server mode?
+
+  overtone.live is fine to start with, but eventually you'll want
+  more/better ugens.
+
+  download from http://supercollider.sourceforge.net/downloads/
+  1) main app -- install normally
+  2) extra plugins -- apparently on the mac it goes to...
+     ~/Library/Application Support/SuperCollider/Extensions/
+
+* should I check into Impromptu?
 
   Found this http://impromptu.moso.com.au/tutorials.html 
-  Useful?
+  what's the difference?
