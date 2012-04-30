@@ -1,12 +1,13 @@
 (ns explore_overtone.guitar)
-;; Guitar by Roger Allen.
+;; Simple Guitar by Roger Allen.
 ;; ----------------------------------------------------------------------
 (do
   (use 'overtone.core)
   (connect-external-server 57110))
 
 ;; ----------------------------------------------------------------------
-(do 
+(do
+  
   ;; an array of 6 guitar strings: EADGBE
   (def guitar-string-tones
     [(note :e3) (note :a3) (note :d4) (note :g4) (note :b4) (note :e5)])
@@ -89,115 +90,37 @@
 (strum :E)
 
 ;; ----------------------------------------------------------------------
-;; working!
+;; some infinite blues...with a bit of randomness thrown in.
 (defn strumming [ m beat ]
-  (println "beat: " beat)
-  (at (m (+ beat 0)) (strum :E))
-  (at (m (+ beat 4)) (strum :G))
-  (apply-at (m (+ beat 8)) #'strumming m (+ beat 8) []))
+  (let [gchords [ (choose '(:E :E7 :Em))
+                  (choose '(:E :E7 :Em))
+                  (choose '(:G :G7 :Gm))
+                  (choose '(:E :E7 :Em))
+                  (choose '(:A :A7 :Am))
+                  (choose '(:E :E7 :Em))
+                  ]
+        next-measure-beat (+ beat (* 2 (.size gchords)))
+        ]
+    (println "beat: " beat " " gchords)
+    (doseq [[index cur-chord]
+            (map vector (iterate inc 0) gchords)]
+      (at (m (+ beat (* 2 index))) (strum cur-chord)))
+    (apply-at (m next-measure-beat) #'strumming m next-measure-beat [])))
 
-(def metro (metronome 120))
-(strumming metro (metro))
+;;(def metro (metronome 120))
+;;(strumming metro (metro))
+;;(stop) ; when you are sick of it...
 
-;; ======================================================================
-;; testcase with fixes at tst2 & 3.
-
-;; first setup simple instrument...
-(definst goo [freq 440 amp 0.5 decay 0.6 ]
-  (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
-     (sin-osc freq) amp))
-;; interesting...trying to pass an array to freq--it expects a pair?
-(definst hoo [freqs [440 :kr] amp 0.5 decay 0.6 ]
-  (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
-     (sin-osc freqs) amp))
-
-(goo 440) ; see that it works
-
-;; now try using at to schedule beats
-(defn tst0 [ m beat ]
-  (println "beat: " beat)
-  (at (m (+ beat 1)) (goo 440))
-  (at (m (+ beat 3)) (goo 400)))
-;; this works...
-(def metro (metronome 180))
-(tst0 metro (metro))
-
-;; now try something just a litle more complex...
-(map goo [400 440]) ; "works"
-;; again try using at to schedule beats
-(defn tst1 [ m beat ]
-  (println "beat: " beat)
-  (at (m (+ beat 1)) (map goo [400 440])) ; ? "silent"
-  (at (m (+ beat 3)) (goo 420)))
-;; the first beat is missing -- why?
-(tst1 metro (metro))
-
-;; fixed with doseq. This works...
-(doseq [i [400 440]] (goo i))
-(defn tst2 [ m beat ]
-  (println "beat: " beat)
-  (at (m (+ beat 1)) (doseq [i [400 440]] (goo i)))
-  (at (m (+ beat 3)) (goo 420)))
-(tst2 metro (metro))
-
-;; and doall, too...
-(doall (map goo [400 440]))
-(defn tst3 [ m beat ]
-  (println "beat: " beat)
-  (at (m (+ beat 1)) (doall (map goo [400 440])))
-  (at (m (+ beat 3)) (goo 420)))
-(tst3 metro (metro))
-
-
-;; end testcase
-;; ======================================================================
-
-(goo 440)
-(goo (midi->hz 69))
-
-;; trying to make it more like above...
-(defn ggoo [i]
-  (goo (midi->hz i))
-  (goo (midi->hz (+ i 1)))
-  (goo (midi->hz (+ i 2)))
-  (goo (midi->hz (+ i 3))))
-(defn testmetro2 [ m beat ]
-  (println "beat2: " beat)
-  (at (m (+ beat 1)) (ggoo 69))
-  (at (m (+ beat 3)) (ggoo 66)))
-(testmetro2 metro (metro))
-
-;;(m)
-
-;; ======================================================================
-;; cruft...
-;; 
-;;(demo 2 (stk-pluck (midicps (vec (chord :c4 :major)))))
-
-;; (definst goo [freq 440 amp 0.5 decay 0.6 ]
-;;   (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
-;;      (sin-osc freq) amp))
-;; ;;(goo)
-;; (def metro (metronome 120))
-;; (defn testmetro [ m beat ]
-;;   (println "beat: " beat)
-;;   (at (m (+ beat 0)) (goo 440))
-;;   (at (m (+ beat 1)) (goo 400))
-;;   (apply-at (m (+ beat 2))
-;;             #'testmetro m (+ beat 2) []))
-;; (testmetro metro (metro))
-
-;;(definst rpluck [tone 60 amp 0.5]
-;;  (* (env-gen (perc 0.01 0.99) 1 1 0 1 FREE)
-;;     (stk-pluck (midicps tone) 1.0) amp))
-;;(rpluck 60)
-
+;; okay...next! how do I get some effects to work?
 ;; play
 ;;(definst g [] (square))
 ;;(def gi (g))
 ;;(inst-fx gi fx-distortion)
 ;;(inst-fx gi fx-reverb)
 ;;(kill gi)
+
+;; ======================================================================
+;; cruft...
 
 ;; MIDI Control ==================================================
 ;;(do 
