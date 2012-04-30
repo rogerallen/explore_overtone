@@ -82,14 +82,14 @@
 
   ;; strum a chord on the guitar
   (defn strum [gchord]
-    (map play-tone (get-tones gchord)))
+    (doall (map play-tone (get-tones gchord))))
 )
 
 ;; works
 (strum :E)
 
 ;; ----------------------------------------------------------------------
-;; this doesn't work...why?
+;; working!
 (defn strumming [ m beat ]
   (println "beat: " beat)
   (at (m (+ beat 0)) (strum :E))
@@ -100,12 +100,16 @@
 (strumming metro (metro))
 
 ;; ======================================================================
-;; testcase
+;; testcase with fixes at tst2 & 3.
 
 ;; first setup simple instrument...
 (definst goo [freq 440 amp 0.5 decay 0.6 ]
   (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
      (sin-osc freq) amp))
+;; interesting...trying to pass an array to freq--it expects a pair?
+(definst hoo [freqs [440 :kr] amp 0.5 decay 0.6 ]
+  (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
+     (sin-osc freqs) amp))
 
 (goo 440) ; see that it works
 
@@ -123,10 +127,27 @@
 ;; again try using at to schedule beats
 (defn tst1 [ m beat ]
   (println "beat: " beat)
-  (at (m (+ beat 1)) (map goo [400 440])) ; "silent"
+  (at (m (+ beat 1)) (map goo [400 440])) ; ? "silent"
   (at (m (+ beat 3)) (goo 420)))
 ;; the first beat is missing -- why?
 (tst1 metro (metro))
+
+;; fixed with doseq. This works...
+(doseq [i [400 440]] (goo i))
+(defn tst2 [ m beat ]
+  (println "beat: " beat)
+  (at (m (+ beat 1)) (doseq [i [400 440]] (goo i)))
+  (at (m (+ beat 3)) (goo 420)))
+(tst2 metro (metro))
+
+;; and doall, too...
+(doall (map goo [400 440]))
+(defn tst3 [ m beat ]
+  (println "beat: " beat)
+  (at (m (+ beat 1)) (doall (map goo [400 440])))
+  (at (m (+ beat 3)) (goo 420)))
+(tst3 metro (metro))
+
 
 ;; end testcase
 ;; ======================================================================
