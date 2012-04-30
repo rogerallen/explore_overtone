@@ -13,6 +13,7 @@
 ;;  2) extra plugins -- apparently on the mac it goes to...
 ;;     ~/Library/Application Support/SuperCollider/Extensions/
 (use 'overtone.core)
+
 (boot-external-server)
 ;; ERROR--got this:
 ;; Unable to locate a valid scsynth executable on your system. I looked in the following places: ["/Applications/SuperCollider/scsynth"]
@@ -46,7 +47,10 @@
 ;; * how to play a simple sine wave?
 (demo 3 (sin-osc 300)) ; 3 seconds of a 300 Hz sine wave
 
-;; 
+;; here is a simple sine wave note
+(definst goo [freq 440 amp 0.5 decay 0.6 ]
+  (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
+     (sin-osc freq) amp))
 
 ;; ......................................................................
 ;; * how to connect to OSC ipad or android controllers
@@ -90,10 +94,27 @@
 
 ;; ......................................................................
 ;; * how to work with scales
+
 ;; ......................................................................
 ;; * how to select chords
+
 ;; ......................................................................
 ;; * how to play a sequence
+
+;; a simple metronome sequence repeating forever
+(definst goo [freq 440 amp 0.5 decay 0.6 ]
+  (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
+     (sin-osc freq) amp))
+;;(goo)
+(def metro (metronome 120))
+(defn testmetro [ m beat ]
+  (println "beat: " beat)
+  (at (m (+ beat 0)) (goo 440)) ; beat 0 play note
+  (at (m (+ beat 1)) (goo 400)) ; beat 1 play note
+  (apply-at (m (+ beat 2))      ; beat 2 schedule a repeat
+            #'testmetro m (+ beat 2) [])) ; call this routine over-and-over
+(testmetro metro (metro))
+
 ;; ......................................................................
 ;; * how to play several parallel sequences/instruments
 ;; ......................................................................
