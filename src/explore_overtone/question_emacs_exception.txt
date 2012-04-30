@@ -1,0 +1,35 @@
+If I haven't installed SuperCollider to run a standalone server, is this expected behavior?
+
+> lein repl
+[INFO] snapshot overtone:scsynth-jna:0.1.2-SNAPSHOT: checking for updates from clojars
+[INFO] snapshot java-osc:java-osc:cvs-SNAPSHOT: checking for updates from clojars
+[INFO] snapshot java-osc:java-osc:cvs-SNAPSHOT: checking for updates from clojars.org
+Copying 16 files to /Users/rallen/Documents/Devel/overtone/rallen/explore_overtone/lib
+REPL started; server listening on localhost port 50962
+user=> (use 'overtone.live)
+Apr 28, 2012 5:25:42 PM sun.reflect.GeneratedMethodAccessor8 invoke
+INFO: booting internal audio server
+Using vector unit: no
+Loading synthdefs from default path: /Users/rallen/Library/Application Support/SuperCollider/synthdefs
+*** ERROR: open directory failed '/Users/rallen/Library/Application Support/SuperCollider/synthdefs'
+
+^^^ this is the warning I'm curious about...is it expected?
+
+I can do simple oscillators
+
+user=> (demo 2 (sin-osc))
+28
+user=> (demo 2 (square))
+28
+
+and I hear the difference, but when I do
+
+user=> (demo 2 (stk-pluck))
+exception in GraphDef_Recv: UGen 'StkPluck' not installed.
+28
+
+Ah, now that I do this from a 'lein repl' I see this clear error, but what confused me here is that if I use emacs, I don't see that exception message. 
+Is that expected?  Or do I need to look closer at my emacs setup?  I seem to get "stdout", but not "stderr".
+
+
+
