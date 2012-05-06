@@ -78,6 +78,21 @@ Option 2:
   ...
   (System/exit 0)
 
+# Results so far...
+
+* Monotron clone
+
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/monotron.clj
+
+  Makes somewhat interesting electronic beeps and also can be
+  controlled via TouchOSC iPad/Android App.
+
+* Guitar
+  
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/guitar.clj
+
+  Strum chords.
+
 # Questions & Answers
 
 Q & A about the environment below.  For questions that can be answered
@@ -118,7 +133,14 @@ I'll write down questions as I think of them.  Answers as I get to them.
   2) extra plugins -- apparently on the mac it goes to...
      ~/Library/Application Support/SuperCollider/Extensions/
 
-* should I check into Impromptu?
+* other resources to look at:
+
+  Impromptu?
 
   Found this http://impromptu.moso.com.au/tutorials.html 
   what's the difference?
+
+  Haskell School of Music
+
+  http://haskell.cs.yale.edu/?page_id=276
+

@@ -73,9 +73,19 @@
   (definst pluck-string
     [freq 440
      amp  1.0]
-    (* (env-gen (perc 0.01 0.99) 1 1 0 1 FREE)
-       (stk-pluck freq 1.0) amp))
-
+    (* amp
+       (pluck
+        (* (white-noise)
+           (env-gen (perc 0.001 2) :action FREE))
+        1.0        ; trig
+        2.0        ; maxdelaytime
+        (/ 1 freq) ; delaytime
+        2.0        ; decaytime
+        0.15)))    ; coef -1 to +1
+    ;;(* (env-gen (perc 0.01 0.99) 1 1 0 1 FREE)
+    ;;   (stk-pluck freq 1.0)
+    ;;   amp)
+    
   ;; play a tone if the tone is not -1
   (defn play-tone [tone]
     (if (> tone 0)
