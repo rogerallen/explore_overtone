@@ -66,7 +66,8 @@
   9 5 7 7 8 1 8 5 7 7 8 0 5 3 2 1 7 1 2 2 6 8 0 6 6 1 3 0 0 1 9 2 7 8
   7 6 6 1 1 1 9 5 9 0 9 2 1 6 4 2 0 1 9 8 9))
 
-(do 
+(do
+  ;; use this to get a tuple (note velocity duration) for indexing 
   (defn s3v [s]
     "given a list s, make it into a list of 3-vectors"
     (map vector
@@ -75,58 +76,53 @@
          (doall (take-nth 3 (nthrest s 2)))))
 
   (defn nth-note-of-scale [tonic type n]
-    "given a digit 'n' in range 0..9 find index in scale defined by
+    "given a digit 'n' in range 0..9 find index in scale defined by
      tonic & type e.g
      user> (nth-note-of-scale :c4 :major 1)
      62"
     (nth (vec (scale tonic type (range 1 10))) (mod n 10)))
 
   (defn i2v [n]
-    "given a digit 'n' in range 0..9 find a velocity to play"
+    "given a digit 'n' in range 0..9, find a velocity to play"
     (+ 60 (* 3 n)))
 
   (defn i2b [n]
-    "given a digit 'n' in range 0..9 find a length in beats"
-    (cond
-      (= 0 n) 1
-      (= 1 n) 1
-      (= 2 n) 1.5
-      (= 3 n) 1.5
-      (= 4 n) 1.75
-      (= 5 n) 1.75
-      (= 6 n) 2
-      (= 7 n) 2
-      (= 8 n) 2.5
-      (= 9 n) 2.5))
+    "given a digit 'n' in range 0..9, find a length in beats"
+    ;;  0    1    2    3    4    5    6    7    8    9
+    ([ 1.00 0.50 1.50 1.50 1.75 2.00 2.25 2.25 2.00 2.50] n ))
 
   (defn playmopi [m beat tonic type num-notes offset]
     "play some pi in a certain key"
-    (do
-      ;;(println "beat: " beat "num-notes: " num-notes "offset: " offset)
-      (doseq [cur-3v
-              (take 1 (nthrest (s3v pi1000) offset))]
-        (let [cur-note (nth-note-of-scale tonic type (nth cur-3v 0))
-              cur-vel (i2v (nth cur-3v 1))
-              cur-dur (i2b (nth cur-3v 2))
-              next-measure-beat (+ beat cur-dur)
-              next-num-notes (- num-notes 1)
-              next-offset (+ offset 1)]
-          (println "mopi:" beat cur-note cur-vel cur-dur)
-          (at (m beat) (piano cur-note 1 cur-vel))
-          (if (> num-notes 0)
-            (apply-at (m next-measure-beat)
-                      #'playmopi m next-measure-beat tonic type next-num-notes next-offset [])))))))
+    (doseq [cur-3v (take 1 (nthrest (s3v pi1000) offset))]
+      (let [cur-note (nth-note-of-scale tonic type (nth cur-3v 0))
+            cur-vel (i2v (nth cur-3v 1))
+            cur-dur (i2b (nth cur-3v 2))
+            next-beat (+ beat cur-dur)
+            next-num-notes (- num-notes 1)
+            next-offset (+ offset 1)]
+        (println "mopi:" beat cur-note cur-vel cur-dur)
+        (at (m beat) (piano cur-note 1 cur-vel))
+        (if (> num-notes 0)
+          (apply-at
+           (m next-beat)
+           #'playmopi m next-beat tonic type next-num-notes next-offset [])
+          next-beat)))))
 
 
 ;;(def metro (metronome 120))
-;;(playmopi metro (metro) :e3 :pentatonic 16 0)
+;;(playmopi metro (metro) :e3 :pentatonic 16 50)
+;;(playmopi metro (metro) :a3 :minor 16 50)
+;;(playmopi metro (metro) :a3 :major 30 50)
 ;;(stop)
 
 ;; ======================================================================
 ;; larger sequences.  use primes...
 (do
-  (playmopi metro (metro) :d3 :pentatonic 13 0)
-  (playmopi metro (+ (metro) (* 3 13)) :d3 :pentatonic 13 0))
+  (println "beat" (metro))
+  (def n (playmopi metro (metro) :d3 :pentatonic 13 0))
+  (println "beat" (n))
+  (println "beat" (+ n 13))
+  (playmopi metro (+ n 13) :d3 :pentatonic 13 0))
 ;; primes to 1000
 (def primes1000 '(2 3 5 7 11 13 17 19 23 29 31 37 41 43 47 53 59 61 67
   71 73 79 83 89 97 101 103 107 109 113 127 131 137 139 149 151 157
@@ -139,3 +135,128 @@
   809 811 821 823 827 829 839 853 857 859 863 877 881 883 887 907 911
   919 929 937 941 947 953 967 971 977 983 991 997))
 
+;; ======================================================================
+;; Coding the wrong way...for posterity.
+
+;; how can I get test000 to return the next beat?
+(do
+  (defn test000 [m beat]
+    (let [cur-note 60
+          cur-vel 100
+          cur-dur 2 ;; <<<< in the real code, this is nondeterministic
+          next-beat (+ beat cur-dur)]
+      (println "test:" beat cur-note cur-vel cur-dur next-beat)
+      (at (m beat) (piano cur-note 1 cur-vel))
+      (if (< beat 5)
+        (do
+          (println "apply")
+          (apply-at
+           (m next-beat)
+           #'test000 m next-beat []))
+        (do
+          (println "last")
+          next-beat)))) ;; <<<< this is the value I'd like test000 to return
+  (def metro (metronome 120))
+  (def x (test000 metro (metro)))
+  (println x))
+
+;; current output
+;; test: 1 60 100 2 3
+;; apply
+;; #<ScheduledFutureTask java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask@154f970c>
+;; test: 3 60 100 2 5
+;; apply
+;; test: 5 60 100 2 7
+;; last
+
+;; desired output is for the return value to be
+;; 7
+;; but there's no way for that to happen.  You can see we don't know 7 until
+;; well after the return.  Okay, need to restructure code.  Return sequence, then play.
+
+
+;; ======================================================================
+;; okay let's transform to a sequence calc & then play seq
+(do
+  ;; use this to get a tuple (note velocity duration) for indexing 
+  (defn s3v [s]
+    "given a list s, make it into a list of 3-vectors"
+    (map vector
+         (doall (take-nth 3 s))
+         (doall (take-nth 3 (nthrest s 1)))
+         (doall (take-nth 3 (nthrest s 2)))))
+
+  ;; index2note
+  (defn nth-note-of-scale [tonic type n]
+    "given a digit 'n' in range 0..9 find index in scale defined by
+     tonic & type e.g
+     user> (nth-note-of-scale :c4 :major 1)
+     62"
+    (nth (vec (scale tonic type (range 1 10))) (mod n 10)))
+
+  ;; index2velocity
+  (defn i2v [n]
+    "given a digit 'n' in range 0..9, find a velocity to play"
+    (+ 60 (* 3 n)))
+
+  ;; index2duration
+  (defn i2b [n]
+    "given a digit 'n' in range 0..9, find a length in beats"
+    ;;  0    1    2    3    4    5    6    7    8    9
+    ([ 1.00 0.50 1.50 1.50 1.75 2.00 2.25 2.25 2.00 2.50] n ))
+
+  ;; do all at once
+  (defn iii2nvd [tonic type cur-3v]
+    "given (n v d) digit tuple, fix (n v d) to be ready to play"
+    (let [ret-3v-n (nth-note-of-scale tonic type (nth cur-3v 0))
+          ret-3v-v (i2v (nth cur-3v 1))
+          ret-3v-d (i2b (nth cur-3v 2))]
+          (list ret-3v-n ret-3v-v ret-3v-d)))
+
+  (defn sum-beats [cur-3v nxt-3v]
+    "given 2 (n v d) tuples, sum the duration to give a beat for the nxt one"
+    (list (nth nxt-3v 0) (nth nxt-3v 1) (+ (nth cur-3v 2) (nth nxt-3v 2))))
+  
+  (defn calcmopi [tonic type num-notes offset]
+    "calc some pi notes in a certain key. doall to remove laziness"
+    (doall (map #(iii2nvd tonic type %) (take num-notes (nthrest (s3v pi1000) offset)))))
+  
+  (defn seqbeats [seq]
+    "how long is a sequence?"
+    (nth (reduce sum-beats seq) 2))
+
+  (defn v34 [cur-3v]
+    (list (nth cur-3v 0) (nth cur-3v 1) (nth cur-3v 2) 0 ))
+  
+  ;; duration2beat 
+  (defn d2b [cur-4v nxt-4v]
+    "given 2 (n v d 0) tuples, sum the duration to give a beat for the nxt one"
+    (let [ret-4v-n (nth nxt-4v 0)
+          ret-4v-v (nth nxt-4v 1)
+          ret-4v-d (nth nxt-4v 2)
+          ret-4v-b (+ (nth cur-4v 2) (nth cur-4v 3))]
+      (list ret-4v-n ret-4v-v ret-4v-d ret-4v-b)))
+
+  (defn playseq [m beat seq]
+    "play a sequence where seq 0 beat aligns with start-beat"
+    (doseq [cur-4v (reductions d2b (map v34 seq))]
+      (let [cur-note (nth cur-4v 0)
+            cur-vel (nth cur-4v 1)
+            cur-dur (nth cur-4v 2)
+            cur-beat (nth cur-4v 3)]
+        (println "pseq:" beat cur-note cur-vel cur-dur cur-beat)
+        (at (m (+ beat cur-beat)) (piano cur-note 1 cur-vel)))))
+
+  (def seq1 (calcmopi :e3 :major 8 10))
+  (def seq-len (seqbeats seq1))
+  (println seq-len)
+  (def metro (metronome 120))
+  (def next-seq-beat (+ (metro) seq-len 10))
+  (println next-seq-beat)
+  (playseq metro (metro) seq1)
+  (playseq metro next-seq-beat seq1)
+  )
+
+;; okay that 3v & 4v stuff has to go.  time to use structures or something.
+   
+  
