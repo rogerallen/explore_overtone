@@ -93,6 +93,10 @@ Option 2:
 
   Strum chords.
 
+* Ambient Piano via Pi
+
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/irrational_infinite_song.clj
+
 # Questions & Answers
 
 Q & A about the environment below.  For questions that can be answered
@@ -111,6 +115,8 @@ I'll write down questions as I think of them.  Answers as I get to them.
   Looks like a nice, more detailed resource:
   http://java.ociweb.com/mark/clojure/article.html
 
+  I've got the O'Reilly book "Clojure" on the way...
+
 * where to understand the basics of emacs+clojure/slime-mode?
 
   http://dev.clojure.org/display/doc/Getting+Started+with+Emacs
@@ -121,7 +127,7 @@ I'll write down questions as I think of them.  Answers as I get to them.
   C-x C-e evaluates & prints out the results into the message area.
   Nothing happens in the repl buffer, but the evaluation does happen.
 
-  M-x slime-eval-region
+  C-c C-r aka M-x slime-eval-region for a whole region of code.
 
 * how do I get a standalone SuperCollider for server mode?
 
