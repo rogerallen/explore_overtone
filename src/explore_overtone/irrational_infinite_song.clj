@@ -52,14 +52,9 @@
   "given a digit 'n' in range 0..9, find a velocity to play"
   (+ 80 (* 3 n)))
 
-;; index2duration
 (defn index2duration [n]
   "given a digit 'n' in range 0..9, find a length in beats"
-  ;;;;  0    1    2    3    4    5    6    7    8    9
-  ;;([ 1.00 0.50 1.50 1.50 1.00 2.00 2.50 2.50 2.00 3.00] n ))
-  ;; try 1/f
-  ;;(defn f [x] (* 4.0 (/ 1 x)))
-  ;;(map f (range 1 11))
+  ;; 1/f histogram of length
   ;;  0    1    2    3    4    5    6    7    8    9
   ([ 4.00 2.00 1.33 1.00 0.80 0.66 0.57 0.50 0.44 0.40] n))
 
@@ -70,10 +65,6 @@
         ret-3v-d (index2duration (nth cur-3v 2))]
     (list ret-3v-n ret-3v-v ret-3v-d 0)))
 
-(defn sum-beats [cur-3v nxt-3v]
-  "given 2 (n v d) tuples, sum the duration to give a beat for the nxt one"
-  (list (nth nxt-3v 0) (nth nxt-3v 1) (+ (nth cur-3v 2) (nth nxt-3v 2))))
-
 (defn duration2beat [cur-4v nxt-4v]
   "given 2 (n v d 0) tuples, sum the duration to give a beat for the nxt one"
   (let [ret-4v-n (nth nxt-4v 0)
@@ -83,25 +74,26 @@
     (list ret-4v-n ret-4v-v ret-4v-d ret-4v-b)))
 
 (defn num-beats [seq]
-  "how long is a sequence?"
-  (nth (reduce sum-beats seq) 2))
+  "how long is a sequence? last duration + last beat"
+  (let [last-4v (nth seq (dec (count seq)))]
+    (+ (nth last-4v 2) (nth last-4v 3))))
 
 (defn calc-seq [tonic type num-notes offset the-series]
-  "calc some notes in a certain key. doall to remove laziness. returns a map of
+  "calc some notes in a certain key. doall to remove laziness. returns a list of
    (note velocity duration curbeat) values"
   (doall (reductions duration2beat
                      (map #(iii2nvd0 tonic type %)
                           (take num-notes (nthrest (s3v the-series) offset))))))
 
 (defn play-seq [m beat seq]
-  "play a sequence where seq 0 beat aligns with start-beat"
+  "play a list of (note velocity duration curbeat) where seq is offset by beat"
   (doseq [cur-4v seq]
     (let [cur-note (nth cur-4v 0)
           cur-vel (nth cur-4v 1)
           cur-dur (nth cur-4v 2)
-          cur-beat (nth cur-4v 3)]
+          cur-beat (+ beat (nth cur-4v 3))]
       ;;(println "play:" (+ beat cur-beat) cur-note cur-vel)
-      (at (m (+ beat cur-beat)) (piano cur-note 1 cur-vel)))))
+      (at (m cur-beat) (piano cur-note 1 cur-vel)))))
 
 (defn infinite-song [m beat tonic type]
   (println "infinite song" beat tonic type)
