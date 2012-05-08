@@ -203,7 +203,7 @@
   (defn i2b [n]
     "given a digit 'n' in range 0..9, find a length in beats"
     ;;  0    1    2    3    4    5    6    7    8    9
-    ([ 1.00 0.50 1.50 1.50 1.75 2.00 2.25 2.25 2.00 2.50] n ))
+    ([ 1.00 0.50 1.50 1.50 1.00 2.00 2.50 2.50 2.00 3.00] n ))
 
   ;; do all at once
   (defn iii2nvd [tonic type cur-3v]
@@ -244,19 +244,45 @@
             cur-vel (nth cur-4v 1)
             cur-dur (nth cur-4v 2)
             cur-beat (nth cur-4v 3)]
-        (println "pseq:" beat cur-note cur-vel cur-dur cur-beat)
+        ;;(println "play:" (+ beat cur-beat) cur-note cur-vel)
         (at (m (+ beat cur-beat)) (piano cur-note 1 cur-vel)))))
+  )
 
-  (def seq1 (calcmopi :e3 :major 8 10))
+(do ; a song
+  (def seq1 (calcmopi :e3 :pentatonic 32 10))
   (def seq-len (seqbeats seq1))
   (println seq-len)
   (def metro (metronome 120))
-  (def next-seq-beat (+ (metro) seq-len 10))
-  (println next-seq-beat)
+  (def seq1-start (+ (metro) 17))
+  (def seq2-start (+ (metro) seq-len 17))
+  (def seq3-start (+ (metro) seq-len 17 seq-len))
+  ;(println next-seq-beat)
   (playseq metro (metro) seq1)
-  (playseq metro next-seq-beat seq1)
-  )
+  (playseq metro seq1-start seq1)
+  (playseq metro seq2-start seq1)
+  (playseq metro seq3-start seq1))
+
+(do ; a forever song
+
+  (def metro (metronome 120))
+  
+  (defn infinite-song [m beat]
+    (println "infinite song" beat)
+    (def seq1 (calcmopi :e3 :pentatonic 32 (mod beat 300)))
+    (def seq-len (seqbeats seq1))
+    (def seq1-start (+ (metro) 17))
+    (def seq2-start (+ (metro) seq-len 17))
+    (playseq metro (metro) seq1)
+    (playseq metro seq1-start seq1)
+
+    (apply-at (m seq2-start) #'infinite-song m seq2-start []))
+
+  (infinite-song metro (metro))
+  
 
 ;; okay that 3v & 4v stuff has to go.  time to use structures or something.
    
-  
+(do
+  (defrecord seq-note [note velocity duration]
+    
+  )
