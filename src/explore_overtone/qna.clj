@@ -23,7 +23,7 @@
 ;; try bringing up app first, open "localhost" window.  click boot button...
 ;; Welcome to SuperCollider 3.5.1, type cmd-d for help
 ;; booting 57110
-(connect-external-server 57110)  ;; YAY this works.
+(connect-external-server 57110) ;; YAY this works.
 
 ;; Note this for later...  If the server is on a different machine use
 ;; (connect-external-server "192.168.1.23" 57110) substituting the
@@ -51,6 +51,7 @@
 (definst goo [freq 440 amp 0.5 decay 0.6 ]
   (* (env-gen (perc 0.01 decay) 1 1 0 1 FREE)
      (sin-osc freq) amp))
+(goo :freq 300 :decay 0.9)
 
 ;; ......................................................................
 ;; * how to connect to OSC ipad or android controllers
