@@ -56,6 +56,12 @@ has what I needed to do:
         $ mv .emacs.d/ .emacs.d.old
         $ cp -R .../live-coding-emacs .emacs.d
 
+   ??? I think I need to do more here...I don't see any fanciness from
+   the live-coding stuff...  I'm not familiar with the .emacs.d directory
+   so, I probably have to do more.
+   Just found this & will need to look into it...
+   http://sam.aaron.name/2010/02/09/hooking-supercollider-up-to-emacs-on-os-x.html
+
 Startup in emacs
 
 Option 1:
@@ -150,3 +156,57 @@ I'll write down questions as I think of them.  Answers as I get to them.
 
   http://haskell.cs.yale.edu/?page_id=276
 
+* how do I try the latest code?
+
+  Just clone the github project & use lein...
+
+  git clone git://github.com/overtone/overtone.git
+  cd overtone
+  lein deps
+  lein repl
+
+  (use 'overtone.live)
+  (definst foo [] (saw 220))
+  (foo)
+
+* how do I use the latest code in my own project?
+
+  From 
+  http://stackoverflow.com/questions/2404426/leiningen-how-to-add-dependencies-for-local-jars 
+  this link looked best:
+  http://www.pgrs.net/2011/10/30/using-local-jars-with-leiningen/
+
+  cd ...local path to your.../overtone
+  edit project.clj to have version ending in "LOCALSNAPSHOT"
+  lein clean
+  lein deps
+  lein jar
+  lein install
+  ...
+  Created .../overtone/overtone/overtone-0.7.0-LOCALSNAPSHOT.jar
+
+  cd .../explore_overtone/
+  mkdir maven_repository
+  edit project.clj adding:
+    :repositories {"local" ~(str (.toURI (java.io.File. "maven_repository")))}
+  and 
+    (defproject explore_overtone "0.0.0"
+      :description "Explorations while trying to learn overtone."
+      :repositories {"local" ~(str (.toURI (java.io.File. "maven_repository")))}
+      :dependencies [ [org.clojure/clojure "1.3.0"]
+                      ;;[overtone "0.6.0"]
+                      [overtone "0.7.0-LOCALSNAPSHOT" ]
+                      ]
+
+  lein clean
+
+  mvn install:install-file \
+    -Dfile=../../overtone/overtone-0.7.0-LOCALSNAPSHOT.jar \
+    -DartifactId=overtone \
+    -Dversion=0.7.0-LOCALSNAPSHOT \
+    -DgroupId=overtone \
+    -Dpackaging=jar \
+    -DlocalRepositoryPath=maven_repository
+
+  lein deps
+  lein repl
