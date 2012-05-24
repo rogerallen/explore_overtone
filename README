@@ -145,6 +145,19 @@ I'll write down questions as I think of them.  Answers as I get to them.
   2) extra plugins -- apparently on the mac it goes to...
      ~/Library/Application Support/SuperCollider/Extensions/
 
+* how do I increase SuperCollider's memory allocation?
+
+See https://groups.google.com/forum/?fromgroups#!topic/overtone/n0zzgY4Z2Vo
+
+Jeff Rose suggests: it is running out of real-time allocated RAM.  (It
+looks like the default amount of RAM is really low, only 8 megs or
+so...)  Inside an SC window I ran this:
+
+s.quit; 
+s.options.memSize = 655360;  // e.g., could be different for you 
+s.boot; 
+
+
 * other resources to look at:
 
   Impromptu?
@@ -182,8 +195,8 @@ I'll write down questions as I think of them.  Answers as I get to them.
   lein deps
   lein jar
   lein install
-  ...
-  Created .../overtone/overtone/overtone-0.7.0-LOCALSNAPSHOT.jar
+    ...
+    Created .../overtone/overtone/overtone-0.7.0-LOCALSNAPSHOT.jar
 
   cd .../explore_overtone/
   mkdir maven_repository
