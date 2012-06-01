@@ -133,47 +133,37 @@
     (println "play-seq0" beat seq1)
     (play-seq m beat seq1)))
 
-(defn piso1 [m beat tonic type]
-  (let [seq1 (calc-seq tonic type 13 0 pi1000)
-        seq1-len (num-beats seq1)
-        num-play-rests 8
-        pi-seq (take num-play-rests pi1000)
-        repeat-counts (take-nth 2 pi-seq)
-        rest-count-sums (conj (take-nth 2 (drop 1 (reductions + pi-seq))) 0)
+(defn ^:dynamic play-repeated-snote-seq
+  [m beat tonic type snote-seq num-play-rests irno-seq]
+  "given snote-seq and a count of play/rest pairs to derive from number sequence irno-seq,
+   play that sequence repeatedly."
+  (let [snote-seq-len (num-beats snote-seq)
+        subset-irno-seq (take (* 2 num-play-rests) irno-seq)
+        ;; 3 1 4 1 5 9 -> repeat-counts = 3 4 5, rest-counts = 1 1 9
+        repeat-counts (take-nth 2 subset-irno-seq)
+        rest-count-sums (conj (take-nth 2 (drop 1 (reductions + subset-irno-seq))) 0)
+        ;; seq-indexes tell when to play the seq as multiple of seq-len
+        ;; 0,1,2,[3],4,5,6,7,[8],9,10,11,12,13,[14...17],18
         seq-indexes (doall (flatten (map #(map (fn [x] (+ %2 x)) %1)
                                          (map range repeat-counts)
                                          rest-count-sums)))
         ]
-    ;;(println seq-indexes)
-    ;; 0,1,2,[3],4,5,6,7,[8],9,10,11,12,13,[14...17],18
-    (println "play-seq1 indexes & len" seq-indexes seq1-len)
-    (doseq [cur-index seq-indexes]
-      (println "play-seq1" cur-index (+ beat (* cur-index seq1-len)))
-      (play-seq m (+ beat (* cur-index seq1-len)) seq1))))
-
-;; refactor!
-(defn piso2 [m beat tonic type]
-  (let [seq1 (calc-seq tonic type 17 0 pi1000)
-        seq1-len (num-beats seq1)
-        num-play-rests 4
-        pi-seq (take num-play-rests (drop num-play-rests pi1000))
-        repeat-counts (take-nth 2 pi-seq)
-        rest-count-sums (conj (take-nth 2 (drop 1 (reductions + pi-seq))) 0)
-        seq-indexes (doall (flatten (map #(map (fn [x] (+ %2 x)) %1)
-                                         (map range repeat-counts)
-                                         rest-count-sums)))
-        ]
-    (println "play-seq2 indexes & len" seq-indexes seq1-len)
-    (doseq [cur-index seq-indexes]
-      (println "play-seq2" cur-index (+ beat (* cur-index seq1-len)))
-      (play-seq m (+ beat (* cur-index seq1-len)) seq1))))
-
-
-(defn piso [m beat tonic type]
+    ;;(println "snote-seq indexes & len" seq-indexes snote-seq-len)
+    (last  ; return latest beat
+     (for [cur-index seq-indexes]
+       (let [cur-beat (+ beat (* cur-index snote-seq-len))]
+         ;;(println "play" cur-index ":" cur-beat)
+         (play-seq m cur-beat snote-seq)
+         (+ cur-beat snote-seq-len))))))
+  
+(defn ^:dynamic piso [m beat tonic type]
   (do
     ;;(piso0 m beat tonic type)))
-    (piso1 m beat tonic type)
-    (piso2 m (+ beat 17) tonic type)))
+    (def seq1 (calc-seq tonic type 13 0 pi1000))
+    (def seq2 (calc-seq tonic type 17 13 pi1000))
+    (def seq2-start (+ beat (* 4 (num-beats seq1))))
+    (play-repeated-snote-seq m beat tonic type seq1 3 pi1000)
+    (play-repeated-snote-seq m seq2-start tonic type seq2 2 pi1000)))
 
 ;; and now, we play...
 ;;(def pfx (inst-fx sampled-piano fx-freeverb))
@@ -187,7 +177,11 @@
 (def qfx (inst-fx sampled-piano fx-reverb))
 (def mfx (inst-fx sampled-piano fx-lpf))
 (ctl mfx :freq      2400)
+
 (def metro (metronome 200))
+;; for ^:dynamic, see http://stackoverflow.com/questions/8875353/why-im-getting-cant-dynamically-bind-non-dynamic-var
+;; (use 'clojure.tools.trace)
+;; (dotrace [piso play-repeated-snote-seq] (piso metro (metro) :c3 :pentatonic))
 (piso metro (metro) :c3 :pentatonic)
 ;;(stop)
 ;;(clear-fx sampled-piano)
