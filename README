@@ -160,6 +160,10 @@ s.boot;
 
 * other resources to look at:
 
+  Abc4j?
+
+  http://code.google.com/p/abc4j/ for display of notes?
+
   Impromptu?
 
   Found this http://impromptu.moso.com.au/tutorials.html 
@@ -193,7 +197,6 @@ s.boot;
   edit project.clj to have version ending in "LOCALSNAPSHOT"
   lein clean
   lein deps
-  lein jar
   lein install
     ...
     Created .../overtone/overtone/overtone-0.7.0-LOCALSNAPSHOT.jar
