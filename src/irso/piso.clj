@@ -97,6 +97,7 @@
   (let [last-snote (last snote-seq)]
     (+ (:beat last-snote) (:duration last-snote))))
 
+;; XXX change calc-seq to calculate num-beats, not num-notes XXX
 (defn calc-seq [tonic type num-notes offset the-series]
   "calc some seq-notes in a certain key. doall to remove laziness. returns a list of
    (pitch velocity duration curbeat) values"
@@ -106,22 +107,22 @@
 
 (defn play-seq [m beat snote-seq]
   "play a list of (pitch velocity duration curbeat) where snote-seq is offset by beat"
-  (doseq [cur-snote snote-seq]
-    (let [cur-pitch (:pitch cur-snote)
-          cur-attack (velocity2attack (:velocity cur-snote))
-          cur-level (velocity2level (:velocity cur-snote))
-          cur-dur (:duration cur-snote)
-          cur-beat (+ beat (:beat cur-snote))
-          k-beat 1.6]
-      ;;(println "note-on:" beat cur-beat cur-pitch cur-snote)
-      (at (m cur-beat) (def pk (sampled-piano :note cur-pitch
-                                              :level cur-level
-                                              :attack cur-attack)))
-      ;;(println "note-off:" (+ cur-beat (* k-beat cur-dur)))
-      (at (m (+ cur-beat (* k-beat cur-dur))) (ctl pk :gate 0)))))
-
-;; ======================================================================
-;; the song
+  (last ; return beat following sequence
+   (for [cur-snote snote-seq]
+     (let [cur-pitch (:pitch cur-snote)
+           cur-attack (velocity2attack (:velocity cur-snote))
+           cur-level (velocity2level (:velocity cur-snote))
+           cur-dur (:duration cur-snote)
+           cur-beat (+ beat (:beat cur-snote))
+           k-beat 1.6]
+       ;;(println "note-on:" beat cur-beat cur-pitch cur-snote)
+       (at (m cur-beat) (def pk (sampled-piano :note cur-pitch
+                                               :level cur-level
+                                               :attack cur-attack)))
+       ;;(println "note-off:" (+ cur-beat (* k-beat cur-dur)))
+       (at (m (+ cur-beat (* k-beat cur-dur))) (ctl pk :gate 0))
+       (+ cur-beat cur-dur)))))
+  
 (defn ^:dynamic play-repeated-snote-seq
   [m beat tonic type snote-seq num-play-rests irno-seq]
   "given snote-seq and a count of play/rest pairs to derive from number sequence irno-seq,
@@ -137,56 +138,76 @@
                                   (map range repeat-counts)
                                   rest-count-sums))]
     ;;(println "snote-seq indexes & len" seq-indexes snote-seq-len)
-    (last  ; return latest beat
+    (last ; return beat following sequence
      (for [cur-index seq-indexes]
        (let [cur-beat (+ beat (* cur-index snote-seq-len))]
          ;;(println "play" cur-index ":" cur-beat)
          (play-seq m cur-beat snote-seq)
          (+ cur-beat snote-seq-len))))))
   
+;; ======================================================================
+;; the song
 (defn ^:dynamic piso [m beat tonic type]
   (do
-    ;;(piso0 m beat tonic type)))
     (def seq1 (calc-seq tonic type 13 0 pi1000))
-    ;;(play-seq m beat seq1)))
     (def seq2 (calc-seq tonic type 17 13 pi1000))
-    ;;(play-seq m beat seq2)))
-    (def seq2-start (+ beat (* 3 (num-beats seq1))))
     (def seq3 (calc-seq tonic type 19 (+ 13 17) pi1000))
-    ;;(play-seq m beat seq3)))
-    (def seq3-start (+ beat (* 5 (num-beats seq2))))
-    (play-repeated-snote-seq m beat tonic type seq1 3 pi1000)
-    (play-repeated-snote-seq m seq2-start tonic type seq2 2 pi1000)
-    (play-repeated-snote-seq m seq3-start tonic type seq3 2 pi1000)))
+    ;;
+    (def b000 (play-seq m beat seq1))
+    (def b001 (play-seq m b000 seq1))
+    (def b002 (play-seq m (+ 2 b001) seq2))
+    (def b003 (play-seq m b002 seq2))
+    (def b004 (play-seq m (+ 2 b003) seq3))
+    (def b005 (play-seq m b004 seq3))
+    (println "introduction from" b000 "to" b005)
+    ;;
+    (def b010 (+ 2 b005))
+    (def b011 (+ b010 (* 3 (num-beats seq1))))
+    (def b012 (+ b010 (* 5 (num-beats seq1))))
+    (def b013 (play-repeated-snote-seq m b010 tonic type seq1 3 pi1000))
+    (def b014 (play-repeated-snote-seq m b011 tonic type seq2 2 pi1000))
+    (def b015 (play-repeated-snote-seq m b012 tonic type seq3 2 pi1000))
+    (println "theme from" b010 "to" (max b013 b014 b015))
+    ;;
+    (def b020 (play-seq m (+ 4 b015) seq3))
+    (def b021 (play-seq m b020 seq3))
+    (def b022 (play-seq m (+ 4 b021) seq2))
+    (def b023 (play-seq m b022 seq2))
+    (def b024 (play-seq m (+ 4 b023) seq1))
+    (def b025 (play-seq m b024 seq1))
+    (println "conclusion from" b015 "to" b025)
+    ))
 
 ;; ======================================================================
 ;; Add effects to create the proper mood
-
-;;(def fx0 (inst-fx sampled-piano fx-freeverb))
-;;(ctl fx0 :room-size 1.5)
-;;(ctl fx0 :dampening 0.5)
-;;(ctl fx0 :wet-dry   0.5) ;; dry = direct.  wet = reflections
-;;
-;; hmm, freeverb seems to resolve eventually to a "ringing" tone that
-;; is distracting.
-
-;; try just reverb...
-(def fx1 (inst-fx sampled-piano fx-reverb))
-
-;; using lowpass filter to remove "ringing" tone.  
-(defsynth fx-lpf
-  [bus 0 freq 20000]
-  (let [src (in bus)]
-    (replace-out bus (lpf src freq))))
-(def fx2 (inst-fx sampled-piano fx-lpf))
-(ctl fx2 :freq      2400)
-
+#_(do 
+  ;;(def fx0 (inst-fx sampled-piano fx-freeverb))
+  ;;(ctl fx0 :room-size 1.5)
+  ;;(ctl fx0 :dampening 0.5)
+  ;;(ctl fx0 :wet-dry   0.5) ;; dry = direct.  wet = reflections
+  ;;
+  ;; hmm, freeverb seems to resolve eventually to a "ringing" tone that
+  ;; is distracting.
+  
+  ;; try just reverb...
+  (def fx1 (inst-fx sampled-piano fx-reverb))
+  
+  ;; using lowpass filter to remove "ringing" tone.  
+  (defsynth fx-lpf
+    [bus 0 freq 20000]
+    (let [src (in bus)]
+      (replace-out bus (lpf src freq))))
+  (def fx2 (inst-fx sampled-piano fx-lpf))
+  (ctl fx2 :freq      2400)
+  )
+;; should also try 'panning' the cutoff frequencies, etc. during music
 ;;(clear-fx sampled-piano)
 
 ;; ======================================================================
-;; and now, we play...
-(def metro (metronome 80))
-(piso metro (metro) :c3 :pentatonic)
+;; and play...
+(do 
+  (def metro (metronome 80))
+  (piso metro (metro) :c3 :pentatonic))
 ;;(stop)
 
 ;; debugging
@@ -194,4 +215,3 @@
 ;; (use 'clojure.tools.trace)
 ;; (dotrace [piso play-repeated-snote-seq] (piso metro (metro) :c3 :pentatonic))
 
-;; should also try 'panning' the cutoff frequencies, etc. during music
