@@ -122,17 +122,6 @@
 
 ;; ======================================================================
 ;; the song
-;;seq2 (calc-seq tonic type 17 13 pi1000)
-;;(def seq2-start (+ (m) 17))
-;;(def nxt-start (+ (m) seq-len 17))
-
-;; (defmacro dbg[x] `(let [x# ~x] (println "dbg:" '~x "=" x#) x#))
-
-(defn piso0 [m beat tonic type]
-  (let [seq1 (calc-seq tonic type 13 0 pi1000)]
-    (println "play-seq0" beat seq1)
-    (play-seq m beat seq1)))
-
 (defn ^:dynamic play-repeated-snote-seq
   [m beat tonic type snote-seq num-play-rests irno-seq]
   "given snote-seq and a count of play/rest pairs to derive from number sequence irno-seq,
@@ -144,10 +133,9 @@
         rest-count-sums (conj (take-nth 2 (drop 1 (reductions + subset-irno-seq))) 0)
         ;; seq-indexes tell when to play the seq as multiple of seq-len
         ;; 0,1,2,[3],4,5,6,7,[8],9,10,11,12,13,[14...17],18
-        seq-indexes (doall (flatten (map #(map (fn [x] (+ %2 x)) %1)
-                                         (map range repeat-counts)
-                                         rest-count-sums)))
-        ]
+        seq-indexes (flatten (map #(map (fn [x] (+ %2 x)) %1)
+                                  (map range repeat-counts)
+                                  rest-count-sums))]
     ;;(println "snote-seq indexes & len" seq-indexes snote-seq-len)
     (last  ; return latest beat
      (for [cur-index seq-indexes]
@@ -160,30 +148,50 @@
   (do
     ;;(piso0 m beat tonic type)))
     (def seq1 (calc-seq tonic type 13 0 pi1000))
+    ;;(play-seq m beat seq1)))
     (def seq2 (calc-seq tonic type 17 13 pi1000))
-    (def seq2-start (+ beat (* 4 (num-beats seq1))))
+    ;;(play-seq m beat seq2)))
+    (def seq2-start (+ beat (* 3 (num-beats seq1))))
+    (def seq3 (calc-seq tonic type 19 (+ 13 17) pi1000))
+    ;;(play-seq m beat seq3)))
+    (def seq3-start (+ beat (* 5 (num-beats seq2))))
     (play-repeated-snote-seq m beat tonic type seq1 3 pi1000)
-    (play-repeated-snote-seq m seq2-start tonic type seq2 2 pi1000)))
+    (play-repeated-snote-seq m seq2-start tonic type seq2 2 pi1000)
+    (play-repeated-snote-seq m seq3-start tonic type seq3 2 pi1000)))
 
-;; and now, we play...
-;;(def pfx (inst-fx sampled-piano fx-freeverb))
-;;(ctl pfx :room-size 1.5)
-;;(ctl pfx :dampening 0.5)
-;;(ctl pfx :wet-dry   0.5) ;; dry = direct.  wet = reflections
+;; ======================================================================
+;; Add effects to create the proper mood
+
+;;(def fx0 (inst-fx sampled-piano fx-freeverb))
+;;(ctl fx0 :room-size 1.5)
+;;(ctl fx0 :dampening 0.5)
+;;(ctl fx0 :wet-dry   0.5) ;; dry = direct.  wet = reflections
+;;
+;; hmm, freeverb seems to resolve eventually to a "ringing" tone that
+;; is distracting.
+
+;; try just reverb...
+(def fx1 (inst-fx sampled-piano fx-reverb))
+
+;; using lowpass filter to remove "ringing" tone.  
 (defsynth fx-lpf
   [bus 0 freq 20000]
   (let [src (in bus)]
     (replace-out bus (lpf src freq))))
-(def qfx (inst-fx sampled-piano fx-reverb))
-(def mfx (inst-fx sampled-piano fx-lpf))
-(ctl mfx :freq      2400)
+(def fx2 (inst-fx sampled-piano fx-lpf))
+(ctl fx2 :freq      2400)
 
-(def metro (metronome 200))
+;;(clear-fx sampled-piano)
+
+;; ======================================================================
+;; and now, we play...
+(def metro (metronome 80))
+(piso metro (metro) :c3 :pentatonic)
+;;(stop)
+
+;; debugging
 ;; for ^:dynamic, see http://stackoverflow.com/questions/8875353/why-im-getting-cant-dynamically-bind-non-dynamic-var
 ;; (use 'clojure.tools.trace)
 ;; (dotrace [piso play-repeated-snote-seq] (piso metro (metro) :c3 :pentatonic))
-(piso metro (metro) :c3 :pentatonic)
-;;(stop)
-;;(clear-fx sampled-piano)
 
 ;; should also try 'panning' the cutoff frequencies, etc. during music
