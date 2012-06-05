@@ -35,6 +35,12 @@
   9 5 7 7 8 1 8 5 7 7 8 0 5 3 2 1 7 1 2 2 6 8 0 6 6 1 3 0 0 1 9 2 7 8
   7 6 6 1 1 1 9 5 9 0 9 2 1 6 4 2 0 1 9 8 9))
 
+(defn linear-map [x0 x1 y0 y1 x]
+  "given x0 -> y0.  x1 -> y1.  x maps linearly to y"
+  (let [dydx (/ (- y1 y0) (- x1 x0))
+        dx (- x x0)]
+    (+ y0 (* dydx dx))))
+        
 ;; change to play the first digits as pitches
 (defn digits2inotes [digit-seq]
   "given a list of digits, make it into a list of index notes"
@@ -53,14 +59,22 @@
   "given a digit 'n' in range 0..9, find a velocity to play"
   (+ 80 (* 3 index)))
 
+(defn velocity2attack [v]
+  "sampled-piano uses attack & level, not velocity"
+  (linear-map 0 127 0.2 0.05 v))
+
+(defn velocity2level [v]
+  "sampled-piano uses attack & level, not velocity"
+  (linear-map 0 127 0.0 0.8 v))
+
 (defn index2duration [index]
   "given a digit 'n' in range 0..9, find a length in beats"
   (cond ;; pick one below...
     ;;        0    1    2    3    4    5    6    7    8    9
     false ([ 4.00 2.00 1.33 1.00 0.80 0.66 0.57 0.50 0.44 0.40] index)  ;; 1/f
-    false  ([ 4.00 2.00 1.50 1.00 0.75 0.75 0.50 0.50 0.50 0.25] index)  ;; 16x range
+    false ([ 4.00 2.00 1.50 1.00 0.75 0.75 0.50 0.50 0.50 0.25] index)  ;; 16x range
     true ([ 4.00 2.00 1.50 1.00 0.75 0.75 0.50 0.50 0.50 0.50] index)  ;; 8x range
-    false ([ 4.00 2.00 1.50 1.00 0.75 0.75 0.50 0.50 0.50 0.25] index))) ;; 4x range
+    false  ([ 4.00 2.00 1.50 1.50 1.25 1.25 1.00 1.00 1.00 1.00] index))) ;; 4x range
 
 (defn inote2snote [tonic type cur-inote]
   "given an index-note, create a sequence-note with a place for a beat."
@@ -78,32 +92,25 @@
    :duration (:duration nxt-snote)
    :beat (+ (:duration cur-snote) (:beat cur-snote))))
 
-(defn linear-map [x0 x1 y0 y1 x]
-  "given x0 -> y0.  x1 -> y1.  x maps linearly to y"
-  (let [dydx (/ (- y1 y0) (- x1 x0))
-        dx (- x x0)]
-    (+ y0 (* dydx dx))))
-        
-(defn velocity2attack [v]
-  "sampled-piano uses attack & level, not velocity"
-  (linear-map 0 127 0.2 0.05 v))
-
-(defn velocity2level [v]
-  "sampled-piano uses attack & level, not velocity"
-  (linear-map 0 127 0.0 0.8 v))
-
 (defn num-beats [snote-seq]
   "how long is a snote sequence? last duration + last beat"
   (let [last-snote (last snote-seq)]
     (+ (:beat last-snote) (:duration last-snote))))
 
-;; XXX change calc-seq to calculate num-beats, not num-notes XXX
-(defn calc-seq [tonic type num-notes offset the-series]
+(defn calc-seq [tonic type num-beats offset the-series]
   "calc some seq-notes in a certain key. doall to remove laziness. returns a list of
    (pitch velocity duration curbeat) values"
-  (doall (reductions duration2beat
-                     (map #(inote2snote tonic type %)
-                          (take num-notes (nthrest (digits2inotes the-series) offset))))))
+  (doall (for [ n (reductions duration2beat
+                              (map #(inote2snote tonic type %)
+                                   (nthrest (digits2inotes the-series) offset)))
+               :while (< (:beat n) num-beats)]
+           (if (> (+ (:beat n) (:duration n)) num-beats)
+             (hash-map
+              :pitch (:pitch n)
+              :velocity (:velocity n)
+              :duration (- num-beats (:beat n))
+              :beat (:beat n))
+             n))))
 
 (defn play-seq [m beat snote-seq]
   "play a list of (pitch velocity duration curbeat) where snote-seq is offset by beat"
@@ -150,8 +157,8 @@
 (defn ^:dynamic piso [m beat tonic type]
   (do
     (def seq1 (calc-seq tonic type 13 0 pi1000))
-    (def seq2 (calc-seq tonic type 17 13 pi1000))
-    (def seq3 (calc-seq tonic type 19 (+ 13 17) pi1000))
+    (def seq2 (calc-seq tonic type 17 (count seq1) pi1000))
+    (def seq3 (calc-seq tonic type 19 (+ (count seq1) (count seq2)) pi1000))
     ;;
     (def b000 (play-seq m beat seq1))
     (def b001 (play-seq m b000 seq1))
@@ -159,7 +166,7 @@
     (def b003 (play-seq m b002 seq2))
     (def b004 (play-seq m (+ 2 b003) seq3))
     (def b005 (play-seq m b004 seq3))
-    (println "introduction from" b000 "to" b005)
+    (println "introduction from" beat "to" b005)
     ;;
     (def b010 (+ 2 b005))
     (def b011 (+ b010 (* 3 (num-beats seq1))))
@@ -208,7 +215,7 @@
 (do 
   (def metro (metronome 80))
   (piso metro (metro) :c3 :pentatonic))
-;;(stop)
+;;(Stop)
 
 ;; debugging
 ;; for ^:dynamic, see http://stackoverflow.com/questions/8875353/why-im-getting-cant-dynamically-bind-non-dynamic-var
