@@ -15,15 +15,13 @@
 (use 'overtone.core)
 
 (boot-external-server)
-;; ERROR--got this:
-;; Unable to locate a valid scsynth executable on your system. I looked in the following places: ["/Applications/SuperCollider/scsynth"]
-;; add /Applications/SuperCollider/SuperCollider.app/Contents/Resources to PATH
-;; still no dice.  Hmmm...filed https://github.com/overtone/overtone/issues/89
+;; Works now bug fixed. https://github.com/overtone/overtone/issues/89
 
-;; try bringing up app first, open "localhost" window.  click boot button...
+;; if you want already running server
+;; bring up app first, open "localhost" window.  click boot button...
 ;; Welcome to SuperCollider 3.5.1, type cmd-d for help
 ;; booting 57110
-(connect-external-server 57110) ;; YAY this works.
+(connect-external-server)
 
 ;; Note this for later...  If the server is on a different machine use
 ;; (connect-external-server "192.168.1.23" 57110) substituting the
