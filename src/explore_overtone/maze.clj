@@ -56,7 +56,7 @@
 (defn draw [w h maze path]
   "Draw the maze and the solution path"
   (doto (javax.swing.JFrame. "Maze")
-   (.setContentPane 
+    (.setContentPane 
      (doto (proxy [javax.swing.JPanel] []
              (paintComponent [^java.awt.Graphics g]
                (let [g (doto ^java.awt.Graphics2D (.create g)
@@ -100,6 +100,7 @@
 
 ;; ======================================================================
 ;; now use the Clojure Programming code...
+;; "2" variants of the routines use y value for changing scale
 
 (defn run-length-encode [x]
   "given a sequence x = (0 1 1 2 ...), encode each item as a tuple [value run-length]"
@@ -112,6 +113,20 @@
                 (conj lst [v 1])))) 
           '[ [0 0] ] x )) ;; starting with initial vector (seq will be in reverse)
 
+(defn run-length-encode2 [x]
+  "like rle above, but each item is a vector [x y] encode each item as a tuple [value run-length start-y]"
+  (reduce (fn [lst v]
+            (let [ lstlst (peek lst) ] ; last item in the list is most recent
+              (if (= (first lstlst) (first v))
+                ;; if same, increment count
+                (conj (pop lst) [(first lstlst)
+                                 (inc (second lstlst))
+                                 (nth lstlst 2)])
+                (conj lst [(first v)
+                           1
+                           (second v)])))) 
+          '[ [0 0 0] ] x )) ;; starting with initial vector (seq will be in reverse)
+
 (defn remove-threshold [x t]
   "remove any node from a run-length-encoded sequence that is <= threshold"
   (reduce (fn [lst v]
@@ -120,11 +135,29 @@
               lst))
           '[ ] x))
 
+(defn remove-threshold2 [x t]
+  "remove any node from a run-length-encoded sequence that is <= threshold"
+  (reduce (fn [lst v]
+            (if (> (second v) t)
+              (conj lst [(first v)
+                         (- (second v) t)
+                         (nth v 2)])
+              lst))
+          '[ ] x))
+
 (defn digits2inotes [rle-seq]
   "given a list of digits, make it into a list of index notes"
   (map #(hash-map :pitch-index (first %1)
-                  :velocity-index 0
+                  :velocity-index 0 ;; FIXME???
                   :duration-index (mod (second %1) 10))
+       rle-seq))
+
+(defn digits2inotes2 [rle-seq]
+  "given a list of digits, make it into a list of index notes + scale"
+  (map #(hash-map :pitch-index (first %1)
+                  :velocity-index 0 ;; FIXME???
+                  :duration-index (mod (second %1) 10)
+                  :scale-index (nth %1 2))
        rle-seq))
 
 (defn index2pitch [tonic type index]
@@ -164,6 +197,17 @@
   (doall (reductions duration2beat
                      (map #(inote2snote tonic type %) rle-notes))))
 
+(defn calc-seq2 [tonic-type-vec rle-notes max-len]
+  "calc some seq-notes in a certain key. doall to remove laziness. returns a list of
+   (pitch velocity duration curbeat) values"
+  (doall (reductions duration2beat
+                     (map #(let [steps-per-scale (/ max-len (count tonic-type-vec))
+                                 index (int (/ (:scale-index %) steps-per-scale))
+                                 tonic-type (nth tonic-type-vec index)
+                                 tonic (first tonic-type)
+                                 type (second tonic-type)]
+                             (inote2snote tonic type %)) rle-notes))))
+
 (defn play-seq [m beat snote-seq]
   "play a list of (pitch velocity duration curbeat) where snote-seq is offset by beat"
   (doseq [cur-snote snote-seq]
@@ -174,6 +218,8 @@
       ;;(println "play:" (+ beat cur-beat) cur-pitch cur-vel)
       (at (m cur-beat) (piano cur-pitch 1 cur-vel)))))
 
+;; ======================================================================
+;; generate & play a melody based on one scale
 (defn gen-play-melody [tonic type max-len]
   "bring everything together and play a melody"
   ;; get a path through the maze
@@ -186,6 +232,7 @@
   ;; remove the notes that only play for 1 beat. Otherwise, this turns into
   ;; just scale exercises (which might be interesting, too)
   (def x-rle2 (remove-threshold x-rle 1))
+  (println "(def x-rle2 "x-rle2")" )
   ;; make the notes into a canonical form, calculate & play the sequence
   (play-seq (metronome 72) 0 (calc-seq tonic type (digits2inotes x-rle2))))
 
@@ -193,4 +240,31 @@
 ;; (gen-play-melody :c3 :minor 64)  << run this to display & play the maze
 ;; (gen-play-melody :d3 :major 64)  << run this to display & play the maze
 
-;; TODO -- add chord progression via Y coordinate.
+;; ======================================================================
+;; generate & play a melody based on a vector of scales
+;; add chord progression via Y coordinate.
+(defn gen-play-melody2 [tonic-type-vec max-len]
+  "bring everything together and play a melody with scale progressions"
+  ;; get a path through the maze
+  (def x (create-maze-path 10 max-len 5))
+  ;; encode the x values from the maze path into a [note duration] sequence
+  (def x-rle (run-length-encode2
+              (map #(first %)
+                   (seq (conj (vec x) [(second (last x)) (first (last x))])))))
+  ;; remove the notes that only play for 1 beat. Otherwise, this turns into
+  ;; just scale exercises (which might be interesting, too)
+  (def x-rle2 (remove-threshold2 x-rle 1))
+  (println "(def x-rle2 "x-rle2")" )
+  ;; make the notes into a canonical form, calculate & play the sequence
+  (play-seq (metronome 72) 0 (calc-seq2 tonic-type-vec (digits2inotes2 x-rle2) max-len)))
+
+(comment
+  ;; adjust & play...
+  (gen-play-melody2 [[:c3 :pentatonic]
+                     [:g4 :pentatonic]
+                     [:a3 :pentatonic]
+                     [:f4 :pentatonic]
+                     [:c3 :pentatonic]
+                     ]
+                    80)
+  )
