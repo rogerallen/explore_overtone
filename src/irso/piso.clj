@@ -3,6 +3,8 @@
 (connect-external-server 57110)
 (use 'overtone.inst.sampled-piano) ;; requires 0.7.0. downloads 200MB
 
+;; exploring this idea further has moved to https://github.com/rogerallen/irso
+
 ;; pi to 1000 digits
 (def pi1000 '(3 1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3
   2 7 9 5 0 2 8 8 4 1 9 7 1 6 9 3 9 9 3 7 5 1 0 5 8 2 0 9 7 4 9 4 4 5
