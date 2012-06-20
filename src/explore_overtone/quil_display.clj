@@ -3,6 +3,17 @@
         [overtone.inst.sampled-piano])
   (:require [quil.core]))
 
+;; ======================================================================
+;; snapshot of code from https://github.com/rogerallen/irso that
+;; displays a list of sequences in a window and follows the beat with
+;; a cursor and highlighted notes.
+;;
+;; when I thought to do this, the timing was off & looking at it standalone
+;; was enough to show me where it went wrong.
+;;
+;; thanks to http://www.seekingclojure.com/post/22144855523/reversi for
+;; showing how to use partial with the sketch
+
 ;;(use 'overtone.live)
 ;;(use 'overtone.inst.sampled-piano)
 ;;(require 'quil.core)

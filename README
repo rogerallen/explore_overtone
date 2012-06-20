@@ -42,25 +42,14 @@ has what I needed to do:
     ...
     (System/exit 0)
 
-4. but, I wasn't satisfied with that...need Emacs.
+4. but, I wasn't satisfied with that...need Emacs.  [Updated
+   instructions are much easier thanks to Emacs 24.1]
 
-   [Note this older video http://vimeo.com/25190186]
+   M-x list-packages 
+   select & install clojure-mode  
 
-    https://github.com/overtone/overtone/wiki/Overtone-in-Emacs
-      add swank-clojure
-      https://github.com/technomancy/swank-clojure
-        add clojure-mode.el
-        http://github.com/technomancy/clojure-mode
-      got live-coding-emacs config
-        $ git clone https://github.com/overtone/live-coding-emacs.git
-        $ mv .emacs.d/ .emacs.d.old
-        $ cp -R .../live-coding-emacs .emacs.d
-
-   ??? I think I need to do more here...I don't see any fanciness from
-   the live-coding stuff...  I'm not familiar with the .emacs.d directory
-   so, I probably have to do more.
-   Just found this & will need to look into it...
-   http://sam.aaron.name/2010/02/09/hooking-supercollider-up-to-emacs-on-os-x.html
+   Have not tried the live-coding in emacs config...
+   TODO https://github.com/overtone/live-coding-emacs.git
 
 Startup in emacs
 
@@ -103,6 +92,18 @@ Option 2:
 
   https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/irrational_infinite_song.clj
 
+  Further explorations on this theme are being developed here https://github.com/rogerallen/irso
+
+* Drawing a random Maze & using it to create a composition.
+
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/maze.clj
+
+  Maze code from "Clojure Programming" Chapter 3.
+
+* Drawing sequences with Quil, playing them with Overtone
+
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/quil_display.clj
+
 # Questions & Answers
 
 Q & A about the environment below.  For questions that can be answered
@@ -121,7 +122,9 @@ I'll write down questions as I think of them.  Answers as I get to them.
   Looks like a nice, more detailed resource:
   http://java.ociweb.com/mark/clojure/article.html
 
-  I've got the O'Reilly book "Clojure" on the way...
+  I've got the O'Reilly book "Programming Clojure" on the way...
+
+  UPDATE: found a bug!  See https://github.com/clojurebook/ClojureProgramming/issues/7
 
 * where to understand the basics of emacs+clojure/slime-mode?
 
