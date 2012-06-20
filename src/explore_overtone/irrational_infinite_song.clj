@@ -1,7 +1,8 @@
 (ns explore_overtone.irrational_infinite_song)
 (use 'overtone.core)
 (connect-external-server 57110)
-(use 'overtone.inst.piano)
+;;(use 'overtone.inst.piano)
+(use 'overtone.inst.sampled-piano) ;; requires 0.7.0. downloads 200MB
 
 ;; pi to 1000 digits
 (def pi1000 '(3 1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3
@@ -45,12 +46,21 @@
 ;; snote = a sequence note after translation & ready to play with an
 ;; associated beat to tell when it will be played.
 
+;; (defn digits2inotes [digit-seq]
+;;   "given a list of digits, make it into a list of index notes"
+;;   (map #(hash-map :pitch-index %1 :velocity-index %2 :duration-index %3)
+;;        (take-nth 3 digit-seq)
+;;        (take-nth 3 (nthrest digit-seq 1))
+;;        (take-nth 3 (nthrest digit-seq 2))))
+
+;; change to play the first digits as pitches
 (defn digits2inotes [digit-seq]
   "given a list of digits, make it into a list of index notes"
-  (map #(hash-map :pitch-index %1 :velocity-index %2 :duration-index %3)
-       (take-nth 3 digit-seq)
-       (take-nth 3 (nthrest digit-seq 1))
-       (take-nth 3 (nthrest digit-seq 2))))
+  (let [n (int (/ (count digit-seq) 3))]
+    (map #(hash-map :pitch-index %1 :velocity-index %2 :duration-index %3)
+         (take n digit-seq)
+         (take n (drop n digit-seq))
+         (take n (drop (* 2 n) digit-seq)))))
 
 (defn index2pitch [tonic type index]
   "given a digit in range 0..9 find index in scale defined by
@@ -83,6 +93,20 @@
    :duration (:duration nxt-snote)
    :beat (+ (:duration cur-snote) (:beat cur-snote))))
 
+(defn linear-map [x0 x1 y0 y1 x]
+  "given x0 -> y0.  x1 -> y1.  x maps linearly to y"
+  (let [dydx (/ (- y1 y0) (- x1 x0))
+        dx (- x x0)]
+    (+ y0 (* dydx dx))))
+        
+(defn velocity2attack [v]
+  "sampled-piano uses attack & level, not velocity"
+  (linear-map 0 127 0.2 0.05 v))
+
+(defn velocity2level [v]
+  "sampled-piano uses attack & level, not velocity"
+  (linear-map 0 127 0.0 0.8 v))
+
 (defn num-beats [snote-seq]
   "how long is a snote sequence? last duration + last beat"
   (let [last-snote (last snote-seq)]
@@ -99,11 +123,24 @@
   "play a list of (pitch velocity duration curbeat) where snote-seq is offset by beat"
   (doseq [cur-snote snote-seq]
     (let [cur-pitch (:pitch cur-snote)
-          cur-vel (:velocity cur-snote)
+          cur-attack (velocity2attack (:velocity cur-snote))
+          cur-level (velocity2level (:velocity cur-snote))
           cur-dur (:duration cur-snote)
           cur-beat (+ beat (:beat cur-snote))]
-      ;;(println "play:" (+ beat cur-beat) cur-pitch cur-vel)
-      (at (m cur-beat) (piano cur-pitch 1 cur-vel)))))
+      ;;(println "note-on:" cur-beat cur-pitch )
+      (at (m cur-beat) (def pk (sampled-piano :note cur-pitch
+                                              :level cur-level
+                                              :attack cur-attack)))
+      ;;(println "note-off:" (+ cur-beat (* 0.9 cur-dur)))
+      (at (m (+ cur-beat (* 1.6 cur-dur))) (ctl pk :gate 0)))))
+
+;; (play-seq
+;;  (metronome 120)
+;;  0
+;;  '({:pitch 60 :velocity 100 :duration 1 :beat 0}
+;;    {:pitch 62 :velocity 100 :duration 1 :beat 1}
+;;    {:pitch 65 :velocity 100 :duration 1 :beat 2}
+;;    ))
 
 (defn infinite-song [m beat tonic type]
   (println "infinite song" beat tonic type)
@@ -117,8 +154,24 @@
   (play-seq m (m) seq1)
   (play-seq m seq1-start seq1)  
   (apply-at (m seq2-start) #'infinite-song m seq2-start tonic type []))
-
+  
 ;; and now, we play...
-(def metro (metronome 60))
-(infinite-song metro (metro) :d3 :major)
-;;(stop) when you must.
+(def metro (metronome 90))
+(def pfx (inst-fx sampled-piano fx-freeverb))
+;;(def lfx (inst-fx fx-freeverb fx-rlpf))
+(def lfx (inst-fx sampled-piano fx-rlpf))
+(do
+  (ctl pfx :room-size 100)
+  (ctl pfx :dampening 0.1)
+  (ctl pfx :wet-dry   0.9) ;; dry = direct.  wet = reflections
+  (ctl lfx :cutoff 1000)
+  (ctl lfx :res 0.9)
+  )
+(infinite-song metro (metro) :c3 :pentatonic)
+;;(stop)
+;;(clear-fx sampled-piano)
+
+;; need to do low-pass filter on the fx-freeverb output.
+;; need to get rid of high-pitched ringing
+
+;; should also try 'panning' the cutoff frequencies, etc. during music
