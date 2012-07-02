@@ -52,7 +52,7 @@
 (goo :freq 300 :decay 0.9)
 
 ;; ......................................................................
-;; * how to connect to OSC ipad or android controllers
+;; * how to connect to ipad or android controllers
 
 ;; * TouchOSC
 ;; 
@@ -64,6 +64,30 @@
 ;;
 ;;   Works for me where Control (below) did not.
 ;;
+
+;; *NEW* midi info--use the event stream.
+;; see https://groups.google.com/forum/?fromgroups#!topic/overtone/d0x91fJg06I
+;; start/stop debug with
+(event-debug-on) 
+;; (event-debug-off) 
+;; example handler...
+(on-event [:midi :note-on] 
+          (fn [e] 
+            (let [note (:note e) 
+                  vel  (:velocity e)] 
+              (foo note vel))) 
+          ::keyboard-handler) 
+
+;; This is the *OLD WAY* 
+(midi-in) ; brings up a dialog, but it can 'pop under' so look for it
+
+;; just listen to the events coming in & 
+(def kb (midi-in "TouchOSC Bridge"))
+(def kb (midi-in "Control Session"))
+(defn midi-listener [event ts]
+  (println "listener: " event))
+(midi-handle-events kb #'midi-listener)
+
 ;; * There is also Control (OSC + Midi)
 ;; 
 ;;   http://itunes.apple.com/us/app/control-osc-+-midi/id413224747?mt=8
@@ -73,15 +97,6 @@
 ;;   communication.  It "mostly" works, but it definitely has issues
 ;;   with closely spaced events.  A bit sad because I liked the
 ;;   javascript editor.
-
-(midi-in) ; brings up a dialog, but it can 'pop under' so look for it
-
-;; just listen to the events coming in & 
-(def kb (midi-in "TouchOSC Bridge"))
-(def kb (midi-in "Control Session"))
-(defn midi-listener [event ts]
-  (println "listener: " event))
-(midi-handle-events kb #'midi-listener)
 
 ;; ......................................................................
 ;; * how to play notes rather than frequencies
