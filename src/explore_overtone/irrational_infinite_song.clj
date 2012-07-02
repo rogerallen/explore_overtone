@@ -1,6 +1,7 @@
 (ns explore_overtone.irrational_infinite_song)
-(use 'overtone.core)
-(connect-external-server 57110)
+(use 'overtone.live)
+;;(use 'overtone.core)
+;;(connect-external-server 57110)
 ;;(use 'overtone.inst.piano)
 (use 'overtone.inst.sampled-piano) ;; requires 0.7.0. downloads 200MB
 

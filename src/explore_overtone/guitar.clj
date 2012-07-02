@@ -1,8 +1,9 @@
 (ns explore_overtone.guitar)
 ;; Simple Guitar by Roger Allen.
 ;; ----------------------------------------------------------------------
-(use 'overtone.core)
-(connect-external-server 57110)
+(use 'overtone.live)
+;;(use 'overtone.core)
+;;(connect-external-server 57110)
 
 ;; ----------------------------------------------------------------------
 ;; an array of 6 guitar strings: EADGBE
