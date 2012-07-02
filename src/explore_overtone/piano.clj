@@ -1,9 +1,11 @@
 (ns explore_overtone.piano)
 ;; noodling on the built in piano instrument
+;; piano requires external server
 ;; ----------------------------------------------------------------------
 (do
   (use 'overtone.core)
-  (connect-external-server 57110))
+  (boot-external-server))
+  ;;(connect-external-server 57110))
 
 ;; simple stuff
 ;;(use 'overtone.inst.piano)
