@@ -123,7 +123,7 @@
         draw-h (- (* (+ seq-h seq-space2) (count snote-seqs)) seq-space2)
         h (+ (* 2 seq-space) draw-h)
         max-seq-beats (reduce max (map max-beat snote-seqs))
-        cur-beat (- (/ (- (now) (start the-metronome)) (tick the-metronome)) offset-beat)]
+        cur-beat (- (/ (- (now) (metro-start the-metronome)) (metro-tick the-metronome)) offset-beat)]
     ;; background
     (apply quil.core/fill (:base1 base-colors))
     (quil.core/no-stroke)
