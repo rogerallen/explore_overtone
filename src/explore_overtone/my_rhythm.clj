@@ -81,26 +81,26 @@
   ;; time (seconds) = integrate rate-fn(spb) dBeats
   (var-metro-time [metro b]
     "convert b to a precise time value"
-    (long (+ @start (integrate @mspb-fn 0 b)))) ;; ??? should this be converted to long?
+    (+ @start (integrate @mspb-fn 0 b)))
 
   IMetronome
-  (metro-start [metro] @start) ;; done
+  (metro-start [metro] @start)
   (metro-start [metro start-beat] ;; done (I think)
     (let [new-start (- (now) (var-metro-time metro start-beat))]
       (reset! start new-start)
       new-start))
-  (metro-tick  [metro] (@bpms-fn (var-metro-now-beat metro))) ;; current tick value
+  (metro-tick  [metro] (bpm2mspb (bpms2bpm (@bpms-fn (var-metro-now-beat metro)))))
   (metro-beat  [metro] (inc (long (var-metro-now-beat metro)))) ;; done
   (metro-beat  [metro b] (var-metro-time metro b)) ;; done
   (metro-bpm   [metro] (bpms2bpm (@bpms-fn (var-metro-now-beat metro)))) ;; done
   (metro-bpm   [metro new-bpm-fn]
     (let [cur-beat (metro-beat metro)
-          new-bpms-fn (fn [x] (bpm2bpms (apply new-bpm-fn x)))
-          new-mspb-fn (fn [x] (bpm2mspb (apply new-bpm-fn x)))
+          new-bpms-fn (fn [x] (bpm2bpms (new-bpm-fn x)))
+          new-mspb-fn (fn [x] (bpm2mspb (new-bpm-fn x)))
           new-start (- (metro-beat metro cur-beat) (integrate new-mspb-fn 0 cur-beat))]
       (reset! start new-start)
-      (reset! bpms-fn (atom new-bpms-fn))
-      (reset! mspb-fn (atom new-mspb-fn))
+      (reset! bpms-fn new-bpms-fn)
+      (reset! mspb-fn new-mspb-fn)
       nil)) ;; return changed...okay?
 
   clojure.lang.ILookup
@@ -139,20 +139,38 @@
         ]
     (VariableRateMetronome. start bpms-fn mspb-fn)))
 
+;; ======================================================================
+;; ======================================================================
+;; ======================================================================
 #_(
    (use 'overtone.live)
+   (use 'overtone.inst.sampled-piano)
    (use 'explore_overtone.my_rhythm)
    (bpm2mspb 60)
-   (defn mytempo [x] (+ 100 (* 10 (java.lang.Math/sin (/ x 3)))))
-   (defn mytempo2 [x] (pwl-fn [0.0 60.0 100.0 180.0] x))
-   (defn mytempo3 [x] (pwl-fn [0.0 60.0 10.0 120.0] (mod x 10)))
-   (def tst1 (variable-rate-metronome mytempo))
-   (def tst2 (variable-rate-metronome mytempo2))
-   (metro-start tst1)
-   (var-metro-now-beat tst1)
-   (var-metro-time tst1 0)
 
-   (use 'overtone.inst.sampled-piano)
+   ;; very basic testing
+   (defn mytempo [x] 100)
+   (def nm (metronome 100.0)) (def vrm (variable-rate-metronome mytempo))
+   (do
+     (println "metro-start" (metro-start nm) (metro-start vrm) (= (metro-start nm) (metro-start vrm)))
+     (println "metro-tick" (metro-tick nm) (metro-tick vrm) (= (metro-tick nm) (metro-tick vrm)))
+     (println "metro-beat" (metro-beat nm) (metro-beat vrm) (= (metro-beat nm) (metro-beat vrm)))
+     (println "metro-beat-10" (metro-beat nm 10) (metro-beat vrm 10) (= (metro-beat nm 10) (metro-beat vrm 10)))
+     (println "metro-bpm" (metro-bpm nm) (metro-bpm vrm) (= (metro-bpm nm) (metro-bpm vrm)))
+     (println ":start" (:start nm) (:start vrm) (= (:start nm) (:start vrm)))
+     (println ":bpm" (:bpm nm) (:bpm vrm) (= (:bpm nm) (:bpm vrm)))
+     (println "(call)" (nm) (vrm) (= (nm) (vrm)))
+     (println "(call 100)" (nm 100) (vrm 100) (= (nm 100) (vrm 100)))
+     )
+   (metro-bpm nm 60.0) (metro-bpm vrm (fn [x] 60))
+   ;; copy-paste test above
+   
+   (defn mytempo [x] (+ 100 (* 10 (java.lang.Math/sin (/ x 3)))))
+   (defn mytempo [x] (pwl-fn [0.0 60.0 100.0 180.0] x))
+   (def vrm (variable-rate-metronome mytempo))
+   (var-metro-now-beat vrm)
+   (var-metro-time vrm 0)
+
    (defn song [m]
      (let [notes [:c3 :d3 :e3 :f3 :g3 :c3 :g3 :c3 :d3 :e3 :f3 :g3 :c3 :g3 :c3 :d3 :e3 :f3 :g3 :c3 :g3 ]
            start-beat (m)]
@@ -160,5 +178,8 @@
          (let [nx (at (m (+ start-beat i)) (sampled-piano :note (note (notes i)) :level 0.8))]
            (at (m (+ start-beat i 0.75)) (ctl nx :gate 0))))))
    (song tst1)
-   
+
+   ;; this one is really bad since it has a huge discontinuity at 10.0-10.1.
+   (defn mytempo-bad [x] (pwl-fn [0.0 60.0 10.0 120.0] (mod x 10)))
+
 )
