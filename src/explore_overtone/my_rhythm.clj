@@ -10,12 +10,13 @@
   (* 1000 (/ 60.0 (java.lang.Math/abs bpm))))
 
 ;; (now) ticks are in ms, not s.
-(defn bpm2bpms [bpm]
+(defn bpm2bps [bpm]
   "beats/min -> beats/millisecond"
-  (/ (/ (java.lang.Math/abs bpm) 60.0) 1000.0))
+  (/ (java.lang.Math/abs bpm) 60.0))
 
-(defn bpms2bpm [bpms]
-  (* (* bpms 1000) 60.0))
+(defn bps2bpm [bps]
+  "beats/sec -> beats/min"
+  (* bps 60.0))
 
 (defn pwl-fn [control-points x]
   (let [[xs0 xs1] (split-with #(<= % x) (take-nth 2 control-points))
@@ -68,16 +69,16 @@
   (var-metro-time [metro b]
     "convert b to a precise time value"))
 
-(deftype VariableRateMetronome [start bpms-fn mspb-fn]
+(deftype VariableRateMetronome [start bps-fn mspb-fn]
 
   VRMetronome
   ;; a metronome is like a rate * time = distance problem
-  ;; a variable-rate metronome needs calculus...
+  ;; a variable-rate metronome needs calculus.
   ;; distance (beats) = rate (beats/second) * time (seconds)
   ;; distance (beats) = integrate rate-fn(bps) dt
   (var-metro-now-beat [metro]
     "convert (now) to a precise beat value"
-    (* 1000 (integrate @bpms-fn 0 (* 0.001 (- (now) @start))))) ;; beats start at 0, measure time in s
+    (integrate @bps-fn 0 (* 0.001 (- (now) @start)))) ;; beats start at 0, measure time in s
   ;; time (seconds) = (1/rate) (seconds/beat) * distance (beats)
   ;; time (seconds) = integrate rate-fn(spb) dBeats
   (var-metro-time [metro b]
@@ -90,17 +91,17 @@
     (let [new-start (- (now) (var-metro-time metro start-beat))]
       (reset! start new-start)
       new-start))
-  (metro-tick  [metro] (bpm2mspb (bpms2bpm (@bpms-fn (var-metro-now-beat metro)))))
+  (metro-tick  [metro] (bpm2mspb (bps2bpm (@bps-fn (var-metro-now-beat metro)))))
   (metro-beat  [metro] (inc (long (var-metro-now-beat metro)))) ;; done
   (metro-beat  [metro b] (var-metro-time metro b)) ;; done
-  (metro-bpm   [metro] (bpms2bpm (@bpms-fn (var-metro-now-beat metro)))) ;; done
+  (metro-bpm   [metro] (bps2bpm (@bps-fn (var-metro-now-beat metro)))) ;; done
   (metro-bpm   [metro new-bpm-fn]
     (let [cur-beat (metro-beat metro)
-          new-bpms-fn (fn [x] (bpm2bpms (new-bpm-fn x)))
+          new-bps-fn (fn [x] (bpm2bps (new-bpm-fn x)))
           new-mspb-fn (fn [x] (bpm2mspb (new-bpm-fn x)))
           new-start (- (metro-beat metro cur-beat) (integrate new-mspb-fn 0 cur-beat))]
       (reset! start new-start)
-      (reset! bpms-fn new-bpms-fn)
+      (reset! bps-fn new-bps-fn)
       (reset! mspb-fn new-mspb-fn)
       nil)) ;; return changed...okay?
 
@@ -133,26 +134,26 @@
 
   [bpm-fn]
   (let [start (atom (now))
-        ;; beats-per-millisecond function since (now) is in ms, not s
-        bpms-fn (atom (fn [x] (bpm2bpms (bpm-fn x))))
+        ;; beats-per-second function. Remember (now) is in ms, not s
+        bps-fn (atom (fn [x] (bpm2bps (bpm-fn x))))
         ;; milliseconds-per-beat function
         mspb-fn (atom (fn [x] (bpm2mspb (bpm-fn x))))
         ]
-    (VariableRateMetronome. start bpms-fn mspb-fn)))
+    (VariableRateMetronome. start bps-fn mspb-fn)))
 
 ;; ======================================================================
-;; ======================================================================
+;; Testing...
 ;; ======================================================================
 #_(
    (use 'overtone.live)
    (use 'overtone.inst.sampled-piano)
    (use 'explore_overtone.my_rhythm)
+   ;;(use :reload-all 'explore_overtone.my_rhythm)
    (bpm2mspb 60)
 
-   ;; very basic testing
-   (defn mytempo [x] 100)
-   (def nm (metronome 100.0)) (def vrm (variable-rate-metronome mytempo))
-   (do
+   ;; very basic testing of normal vs. variable (when variable doesn't vary)
+   (defn test-nm-vrm [nm vrm]
+     (println "--------------------")
      (println "metro-start" (metro-start nm) (metro-start vrm) (= (metro-start nm) (metro-start vrm)))
      (println "metro-tick" (metro-tick nm) (metro-tick vrm) (= (metro-tick nm) (metro-tick vrm)))
      (println "metro-beat" (metro-beat nm) (metro-beat vrm) (= (metro-beat nm) (metro-beat vrm)))
@@ -163,13 +164,26 @@
      (println "(call)" (nm) (vrm) (= (nm) (vrm)))
      (println "(call 100)" (nm 100) (vrm 100) (= (nm 100) (vrm 100)))
      )
+   (defn mytempo [x] 100)
+   (def nm (metronome 100.0)) (def vrm (variable-rate-metronome mytempo))
+   (test-nm-vrm nm vrm)
+   (Thread/sleep 2000)
    (metro-bpm nm 60.0) (metro-bpm vrm (fn [x] 60))
-   ;; copy-paste test above
-   
+   (test-nm-vrm nm vrm)
+   (Thread/sleep 2000)
+   (metro-start nm (nm)) (metro-start vrm (vrm))
+   (test-nm-vrm nm vrm)
+   ;; currently failing!
+
+   ;; ----------------------------------------------------------------------
+   ;; trying a varying sine wave + offset works "okay" but the naive
+   ;; integrator needs a bit of help.  We need to work around a
+   ;; serious issue -- as time goes on and ((now) - start-beat) gets
+   ;; large, the integrator gets more & more inaccurate & the beat can
+   ;; go backwards in time.
    (defn mytempo [x] (+ 120 (* 60 (java.lang.Math/sin (/ x 3.1415)))))
    (def nm (metronome 100.0))
    (def vrm (variable-rate-metronome mytempo))
-   ;; !!! this is showing serious issue -- the beat goes backwards!
    (dotimes [i 20]
      (println (nm) (var-metro-now-beat vrm)))
    (dotimes [i 20]
@@ -177,14 +191,15 @@
    (dotimes [i 20]
      (println i (- (vrm i) (metro-start vrm))))
    
-   (defn mytempo [x] (pwl-fn [0.0 60.0 100.0 180.0] x))
+   (defn mytempo [x] (pwl-fn [0.0 60.0 12.0 180.0] x))
    (def vrm (variable-rate-metronome mytempo))
    (var-metro-now-beat vrm)
    (var-metro-time vrm 0)
 
    (defn song [m]
      (let [notes [:c3 :d3 :e3 :f3 :g3 :c3 :g3 :c3 :d3 :e3 :f3 :g3 :c3 :g3 :c3 :d3 :e3 :f3 :g3 :c3 :g3 ]
-           start-beat (m)
+           _ (metro-start m (m)) ;; reset metronome to restart on next beat
+           start-beat 0 ;; try starting at 0
            the-now (now)]
        (dotimes [i (count notes)]
          (println start-beat i (+ start-beat i) (m) (long (m (+ start-beat i))) the-now)
