@@ -59,7 +59,8 @@
              (adaptive-rule-recurse rule f midpoint b half-desired-error))))))
 
 (defn integrate [f a b]
-  (adaptive-rule-recurse booles-rule f a b 0.5)) ;; 1/2 ms should be enough accuracy
+  ;;(println "integrate" a b)
+  (adaptive-rule-recurse booles-rule f a b 0.05)) ;; 1/2 ms should be enough accuracy
 
 (defprotocol VRMetronome
   (var-metro-now-beat [metro]
@@ -76,7 +77,7 @@
   ;; distance (beats) = integrate rate-fn(bps) dt
   (var-metro-now-beat [metro]
     "convert (now) to a precise beat value"
-    (integrate @bpms-fn 0 (- (now) @start))) ;; beats start at 0
+    (* 1000 (integrate @bpms-fn 0 (* 0.001 (- (now) @start))))) ;; beats start at 0, measure time in s
   ;; time (seconds) = (1/rate) (seconds/beat) * distance (beats)
   ;; time (seconds) = integrate rate-fn(spb) dBeats
   (var-metro-time [metro b]
@@ -165,7 +166,17 @@
    (metro-bpm nm 60.0) (metro-bpm vrm (fn [x] 60))
    ;; copy-paste test above
    
-   (defn mytempo [x] (+ 100 (* 10 (java.lang.Math/sin (/ x 3)))))
+   (defn mytempo [x] (+ 120 (* 60 (java.lang.Math/sin (/ x 3.1415)))))
+   (def nm (metronome 100.0))
+   (def vrm (variable-rate-metronome mytempo))
+   ;; !!! this is showing serious issue -- the beat goes backwards!
+   (dotimes [i 20]
+     (println (nm) (var-metro-now-beat vrm)))
+   (dotimes [i 20]
+     (println (nm) (vrm)))
+   (dotimes [i 20]
+     (println i (- (vrm i) (metro-start vrm))))
+   
    (defn mytempo [x] (pwl-fn [0.0 60.0 100.0 180.0] x))
    (def vrm (variable-rate-metronome mytempo))
    (var-metro-now-beat vrm)
@@ -173,11 +184,13 @@
 
    (defn song [m]
      (let [notes [:c3 :d3 :e3 :f3 :g3 :c3 :g3 :c3 :d3 :e3 :f3 :g3 :c3 :g3 :c3 :d3 :e3 :f3 :g3 :c3 :g3 ]
-           start-beat (m)]
+           start-beat (m)
+           the-now (now)]
        (dotimes [i (count notes)]
+         (println start-beat i (+ start-beat i) (m) (long (m (+ start-beat i))) the-now)
          (let [nx (at (m (+ start-beat i)) (sampled-piano :note (note (notes i)) :level 0.8))]
            (at (m (+ start-beat i 0.75)) (ctl nx :gate 0))))))
-   (song tst1)
+   (song vrm)
 
    ;; this one is really bad since it has a huge discontinuity at 10.0-10.1.
    (defn mytempo-bad [x] (pwl-fn [0.0 60.0 10.0 120.0] (mod x 10)))
