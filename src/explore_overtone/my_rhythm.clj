@@ -88,7 +88,7 @@
   IMetronome
   (metro-start [metro] @start)
   (metro-start [metro start-beat] ;; done (I think)
-    (let [new-start (- (now) (var-metro-time metro start-beat))]
+    (let [new-start (- (now) (- (var-metro-time metro start-beat) @start))]
       (reset! start new-start)
       new-start))
   (metro-tick  [metro] (bpm2mspb (bps2bpm (@bps-fn (var-metro-now-beat metro)))))
@@ -173,7 +173,6 @@
    (Thread/sleep 2000)
    (metro-start nm (nm)) (metro-start vrm (vrm))
    (test-nm-vrm nm vrm)
-   ;; currently failing!
 
    ;; ----------------------------------------------------------------------
    ;; trying a varying sine wave + offset works "okay" but the naive
