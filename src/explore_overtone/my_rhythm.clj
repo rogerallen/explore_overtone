@@ -309,11 +309,15 @@ points."
   (metro-beat  [metro] (inc (long (vr-metro-now-beat metro))))
   (metro-beat  [metro b] (vr-metro-time metro b))
   (metro-bpm   [metro] (bps2bpm (@beat2bps-fn (vr-metro-now-beat metro))))
-  (metro-bpm   [metro control-points]
+  (metro-bpm   [metro bpm-control-points]
     (let [cur-beat (metro-beat metro)
-          new-beat2bps-fn (partial pwl-fn control-points)
-          new-time2beat-fn (partial pwl-time2beat control-points)
-          new-beat2time-fn (partial pwl-beat2time control-points)
+          bps-control-points (apply vector (flatten (map vector
+                                                         (take-nth 2 bpm-control-points)
+                                                         (map bpm2bps
+                                                              (take-nth 2 (drop 1 bpm-control-points))))))
+          new-beat2bps-fn (partial pwl-fn bps-control-points)
+          new-time2beat-fn (partial pwl-time2beat bps-control-points)
+          new-beat2time-fn (partial pwl-beat2time bps-control-points)
           new-start (- (metro-beat metro cur-beat) (* 1000 (beat2time-fn cur-beat)))]
       (reset! start new-start)
       (reset! beat2bps-fn new-beat2bps-fn)
@@ -338,12 +342,16 @@ points."
   ;; I don't know what this is. ??? (invoke [this _ new-bpm] (.bpm this new-bpm)))
   )
 
-(defn pwl-metronome ;; FIXME bpm -> beats-per-second 
-  [control-points]
+(defn pwl-metronome 
+  [bpm-control-points]
   (let [start (atom (now))
-        beat2bps-fn (atom (partial pwl-fn control-points))
-        time2beat-fn (atom (partial pwl-time2beat control-points))
-        beat2time-fn (atom (partial pwl-beat2time control-points))]
+        bps-control-points (apply vector (flatten (map vector
+                                                       (take-nth 2 bpm-control-points)
+                                                       (map bpm2bps
+                                                            (take-nth 2 (drop 1 bpm-control-points))))))
+        beat2bps-fn (atom (partial pwl-fn bps-control-points))
+        time2beat-fn (atom (partial pwl-time2beat bps-control-points))
+        beat2time-fn (atom (partial pwl-beat2time bps-control-points))]
     (VariableRateMetronome2. start beat2bps-fn time2beat-fn beat2time-fn)))
 
 ;; ======================================================================
@@ -377,10 +385,17 @@ points."
            (at (m (+ i 0.75)) (ctl nx :gate 0))))))
 
    ;; metronomes to try with (song vrm)
-   ;; An important feature is C0 continuity == no "jumps" in tempo
-   (def vrm (vr-metronome
-             (fn [x] (pwl-fn [0.0 60.0 16.0 240.0 32.0 60.0] x))))
+   ;; slow transition
+   (def vrm (pwl-metronome [0.0 60.0 16.0 240.0 32.0 60.0 1000.0 60.001]))
    (song vrm)
+   ;; fast transitions (not possible with vr-metronome)
+   (def vrm (pwl-metronome [ 0.0  60.0   15.99  60.01
+                            16.0 240.0   27.99 240.01
+                            28.0  60.0 1000.00  60.01]))
+   (song vrm)
+
+
+   ;; ======================================================================
    ;; others, just to play around...
    (def vrm (vr-metronome
              #(pwl-fn [0.0 240.0 16.0 60.0 32.0 240.0] %)))
@@ -388,7 +403,7 @@ points."
              #(pwl-fn [0.0 60.0 6.0 240.0 10.0 240.0 12.0 60.0] (mod % 12))))
    ;; this has a nice "swing"...cosine wave with a period of 4 beats.
    (def vrm (vr-metronome
-             #(+ 180 (* 90 (Math/cos (/ (* % 2 3.14159265358979) 4.0))))))
+             #(+ 180 (* 90 (Math/cos (/ (* % 2 Math/PI) 4.0))))))
 
    ;; this one is really bad since it has a huge discontinuity at 10.0-10.1.
    ;; Just for illustration--don't do this unless you want to hang.
@@ -403,11 +418,12 @@ points."
    ;; serious issue -- as time goes on and ((now) - start-beat) gets
    ;; large, the integrator gets more & more inaccurate & the beat can
    ;; go backwards in time.
-   (defn mytempo [x] (+ 120 (* 60 (Math/sin (/ x 3.1415)))))
+   (defn mytempo [x] (+ 120 (* 60 (Math/sin (/ x Math/PI)))))
    (def nm (metronome 100.0))
    (def vrm (vr-metronome mytempo))
+   (def vrm2 (pwl-metronome [0.0 100.0 10000.0 100.01]))
    (dotimes [i 20]
-     (println (nm) (vr-metro-now-beat vrm)))
+     (println (nm) (vr-metro-now-beat vrm) (vr-metro-now-beat vrm2)))
    (dotimes [i 20]
      (println (nm) (vrm)))
    (dotimes [i 20]
@@ -443,7 +459,7 @@ points."
    ;; Current implementation has issues...
    (def vrm (vr-metronome #(pwl-fn [0.0 200.0 32.0 400.0] %)))
    (def vrm (vr-metronome #(pwl-fn [0.0 20.0 32.0 40.0] %)))
-   (def vrm (pwl-metronome [0.0 1.0 50.0 2.0 100.0 1.0]))
+   (def vrm (pwl-metronome [0.0 60.0 50.0 120.0 100.0 60.0]))
    (defn test-b-t [vrm]
      ;;(println "b" "dt" "b'")
      (println "(def ds (to-dataset [")
@@ -462,6 +478,8 @@ points."
      )
    (test-b-t vrm)
 
+   ;; incanter stuff...
+   (use '(incanter core charts))
    (with-data ds
      (doto (xy-plot :time :beat)
        (add-lines :time :beat2)
