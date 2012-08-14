@@ -104,6 +104,12 @@ Option 2:
 
   https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/quil_display.clj
 
+* A Variable-Rate Metronome
+ 
+  Who would have thought that musical tempo involved calculus & differential equations?
+
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/my_rhythm.clj
+
 # Questions & Answers
 
 Q & A about the environment below.  For questions that can be answered
@@ -162,6 +168,12 @@ s.boot;
 
 
 * other resources to look at:
+
+  Supercollider Links
+
+  http://sccode.org/
+  http://www.freesound.org/
+  http://theremin.music.uiowa.edu/
 
   Abc4j?
 
