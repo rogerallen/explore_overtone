@@ -2,55 +2,74 @@
   (:use [overtone.music time]
         [overtone.music.rhythm]))
 
-;; DOCS NOT UP-TO-DATE! New method to describe.  See VariableRateMetronome2...
-
 ;; A Variable Rate (vr) metronome is a metronome that takes a tempo
-;; function and uses integration to find the current beat.
+;; function and uses numerical methods to find the current beat.
 ;;
-;; A variable-rate metronome is like solving a rate * time = distance
+;; A variable-rate metronome is a kind of rate * time = distance
 ;; problem, where the "distance' is measured in 'beats'.  Since rate
-;; is a function of time, this metronome needs calculus to solve for
-;; the current beat (given rate & time) or to solve for time (given
-;; rate & beat) or current distance
+;; is a function of time, this metronome needs calculus and
+;; differential equations to solve for the current beat or the current
+;; time.
 ;;
-;; the basic formula is:
+;; The basic formula is:
 ;;   distance (beats) = rate (beats/second) * time (seconds)
-;; and since rate is a function of the current beat
-;;   distance (beats) = integrate bps-rate-fn() dt
-;; similarly,
-;;   time (seconds) = (1/rate) (seconds/beat) * distance (beats)
-;;   time (seconds) = integrate spb-rate-fn() dBeats
+;; 
+;; But, the tempo (i.e. rate) is specified as a function of the current beat.
+;;   tempo (beats/sec) = f(beat) = bps-rate-fn(beat)
+;; which makes this a differential equation.
 ;;
-;; As long as your tempo functions do not have discontinuities (aka
-;; they change smoothly) then this should work out.  Be careful,
+;; So, to solve for beats,
+;;   distance (beats) = integrate bps-rate-fn(beats) dt               [1]
+;; requires Euler's method or perhaps the Runge-Kutta method to solve.
+;;
+;; But, to solve for time,
+;;   time (seconds) = (1/rate) (seconds/beat) * distance (beats)
+;;   time (seconds) = integrate spb-rate-fn(beat) dBeats              [2]
+;; there is separation of variables, so we can use numerical integration.
+;;
+;; VariableRateMetronome and vr-metronome
+;; 
+;; Currently uses code based on John Lawrence Aspden's blog.
+;; * Euler's method:
+;;   http://www.learningclojure.com/2010/09/clojure-is-fast.html
+;; * Numerical integration:
+;;   http://www.learningclojure.com/2011/05/numerical-integration-better_26.html
+;; The code could likely be improved, but it one was concise & solid enough
+;; to work through some initial examples.
+;;
+;; As long as your tempo functions do not have discontinuities (e.g.
+;; they change smoothly) then this method should work.  Be careful,
 ;; though, since discontinuities can hang the solver.
 ;;
 ;; Another thing to keep in mind is that the integration function will
 ;; take longer & longer as the current beat gets further from zero.
 ;; It may also become more imprecise, so try to work near beat 0.  Use
-;; the fn (start-beat m 0) to reset when you can.  This is the biggest
-;; issue with the current implementation.
+;; the function (start-beat m 0) to reset when you can.  This is the biggest
+;; problem with the current implementation.
 ;;
-;; Currently uses a numerical integration algorithm that I found on
-;; John Lawrence Aspden's blog.  See:
-;; http://www.learningclojure.com/2011/05/numerical-integration-better_26.html
-;; There are likely better, faster & more-robust algorithms out there
-;; that we could use, but this one was consise & solid enough to work
-;; through some initial examples.
+;; VariableRateMetronome2 and pwl-metronome
+;; 
+;; For some functions, direct integration can be used to figure out
+;; the current beat or time.  This removes the largest issue with
+;; VariableRateMetronome--the iteration time required to solve.  With
+;; direct integration, we can just call a function, and with handy
+;; online sources like Wolfram Alpha, we can find these functions
+;; easily enough. For simple functions like the piece-wise-linear
+;; function, the integral function is straightforward.  We can pass
+;; both the function and the integration function.
 ;;
-;; Another tack to take might be to use direct integration to figure
-;; out the current beat.  For simple functions like the
-;; piece-wise-linear function, and sine + offset below, the integral
-;; function is pretty straightforward and perhaps the better way to go
-;; about this would be to pass both the function and the integration
-;; function.  This could also be a way to allow for discontinuities
-;; that are likely a major issue with the current implementation.
+;; This is the type of metronome used by pwl-metronome.
 ;;
-
+;; I want to thank Anthony Grabowski for his help with the math.  I
+;; couldn't have done it without him.
+;;
+;; Etc
+;;
 ;; Found an old discussion on this:
-;; http://lalists.stanford.edu/lad/1999/05/0127.html
-;; and I see that there is something similar in the pythonsound project "timewarp"
+;; http://lalists.stanford.edu/lad/1999/05/0127.html and I see that
+;; there is something similar in the pythonsound project "timewarp"
 ;; http://pythonsound.sourceforge.net/guide/x240.html
+;; 
 
 (defn bpm2mspb
   "beats/min -> milliseconds/beat"
@@ -193,9 +212,23 @@ points."
              (adaptive-rule-recurse rule f midpoint b half-desired-error))))))
 
 (defn integrate [f a b]
-  ;; accurate to 5/100 of a beat or second...good enough?
-  ;; something to keep investigating...
-  (adaptive-rule-recurse booles-rule f a b 5))
+  ;; accurate to 1/100 of a beat...good enough?
+  (adaptive-rule-recurse booles-rule f a b 0.01))
+
+(defn euler-iter [f t0 y0 h its]
+  (let [zero (int 0)]
+    (loop [t0 (double t0) y0 (double y0) h (double h) its (int its)]
+      (if (> its zero) 
+        (let [t1 (+ t0 h)
+              y1 (+ y0 (* h (f y0)))] ;; note bps-fn does not depend on t
+          (recur t1 y1 h (dec its)))
+      y0))))
+
+(defn euler [f t]
+  (let [n   5000          ;; number of iterations/second...enough? too much?
+        h   (/ 1.0 n)      ;; h is the iteration delta in seconds
+        its (int (* n t))] ;; time expressed as total iterations
+  (euler-iter f 0.0 0.0 h its)))
 
 ;; Add 2 functions to the Metronome protocol
 (defprotocol VRMetronome
@@ -212,16 +245,12 @@ points."
 (deftype VariableRateMetronome [start bps-fn mspb-fn]
 
   VRMetronome
-  ;; distance (beats) = rate (beats/second) * time (seconds)
-  ;; distance (beats) = integrate rate-fn(bps) dt
   (vr-metro-beat [metro ticks]
     "convert ticks (in ms) to a precise floating-point beat value.  Not a whole number."
-    (integrate @bps-fn 0 (* 0.001 (- ticks @start)))) ;; time in seconds, not ms
+    (euler @bps-fn (* 0.001 (- ticks @start)))) ;; time in seconds, not ms
   (vr-metro-now-beat [metro]
     "convert (now) to a precise beat value"
     (vr-metro-beat metro (now)))
-  ;; time (seconds) = (1/rate) (seconds/beat) * distance (beats)
-  ;; time (seconds) = integrate rate-fn(spb) dBeats
   (vr-metro-time [metro b]
     "convert b to a precise time value"
     (+ @start (integrate @mspb-fn 0 b)))
@@ -311,10 +340,11 @@ points."
   (metro-bpm   [metro] (bps2bpm (@beat2bps-fn (vr-metro-now-beat metro))))
   (metro-bpm   [metro bpm-control-points]
     (let [cur-beat (metro-beat metro)
-          bps-control-points (apply vector (flatten (map vector
-                                                         (take-nth 2 bpm-control-points)
-                                                         (map bpm2bps
-                                                              (take-nth 2 (drop 1 bpm-control-points))))))
+          bps-control-points (apply vector
+                                    (flatten (map vector
+                                                  (take-nth 2 bpm-control-points)
+                                                  (map bpm2bps
+                                                       (take-nth 2 (drop 1 bpm-control-points))))))
           new-beat2bps-fn (partial pwl-fn bps-control-points)
           new-time2beat-fn (partial pwl-time2beat bps-control-points)
           new-beat2time-fn (partial pwl-beat2time bps-control-points)
@@ -343,12 +373,22 @@ points."
   )
 
 (defn pwl-metronome 
+  "A piecewise-linear (pwl) variable rate metronome is a beat
+  management function that varies over time according to specified
+  tempos and beats. Give it a list of tempo (beats per minute) and
+  beat pairs to use.  Call the returned function with no arguments to get the
+  next beat number, or pass it a beat number to get the timestamp to
+  play a note at that beat.
+
+  FIXME - Add more docs here.  See source for the moment."
   [bpm-control-points]
   (let [start (atom (now))
-        bps-control-points (apply vector (flatten (map vector
-                                                       (take-nth 2 bpm-control-points)
-                                                       (map bpm2bps
-                                                            (take-nth 2 (drop 1 bpm-control-points))))))
+        bps-control-points
+        (apply
+         vector
+         (flatten (map vector
+                       (take-nth 2 bpm-control-points)
+                       (map bpm2bps (take-nth 2 (drop 1 bpm-control-points))))))
         beat2bps-fn (atom (partial pwl-fn bps-control-points))
         time2beat-fn (atom (partial pwl-time2beat bps-control-points))
         beat2time-fn (atom (partial pwl-beat2time bps-control-points))]
@@ -385,25 +425,30 @@ points."
            (at (m (+ i 0.75)) (ctl nx :gate 0))))))
 
    ;; metronomes to try with (song vrm)
-   ;; slow transition
+   ;; slow transition with pwl-metronome
    (def vrm (pwl-metronome [0.0 60.0 16.0 240.0 32.0 60.0 1000.0 60.001]))
    (song vrm)
+   ;; same, but use vr-metronome
+   ;; Hmm. I see differences in beat time vs. above.  FIXME?
+   (def vrm (vr-metronome
+             #(pwl-fn [0.0 60.0 16.0 240.0 32.0 60.0 1000.0 60.001] %)))
+   (song vrm)
+   
    ;; fast transitions (not possible with vr-metronome)
    (def vrm (pwl-metronome [ 0.0  60.0   15.99  60.01
                             16.0 240.0   27.99 240.01
                             28.0  60.0 1000.00  60.01]))
    (song vrm)
 
-
-   ;; ======================================================================
-   ;; others, just to play around...
+   ;; repeat over 8 beats
    (def vrm (vr-metronome
-             #(pwl-fn [0.0 240.0 16.0 60.0 32.0 240.0] %)))
-   (def vrm (vr-metronome
-             #(pwl-fn [0.0 60.0 6.0 240.0 10.0 240.0 12.0 60.0] (mod % 12))))
+             #(pwl-fn [0.0 60.0 4.0 240.0 6.0 240.0 8.0 60.0] (mod % 8))))
+   (song vrm)
+   
    ;; this has a nice "swing"...cosine wave with a period of 4 beats.
    (def vrm (vr-metronome
              #(+ 180 (* 90 (Math/cos (/ (* % 2 Math/PI) 4.0))))))
+   (song vrm)
 
    ;; this one is really bad since it has a huge discontinuity at 10.0-10.1.
    ;; Just for illustration--don't do this unless you want to hang.
@@ -455,34 +500,42 @@ points."
    (test-nm-vrm nm vrm)
 
    ;; ----------------------------------------------------------------------
-   ;; this shows that vr-metro-time & vr-metro-beat don't match up.
-   ;; Current implementation has issues...
-   (def vrm (vr-metronome #(pwl-fn [0.0 200.0 32.0 400.0] %)))
-   (def vrm (vr-metronome #(pwl-fn [0.0 20.0 32.0 40.0] %)))
-   (def vrm (pwl-metronome [0.0 60.0 50.0 120.0 100.0 60.0]))
-   (defn test-b-t [vrm]
+   ;; this shows that vr-metro-time & vr-metro-beat match up.
+   (defn test-b-t [name vrm vrm2]
      ;;(println "b" "dt" "b'")
-     (println "(def ds (to-dataset [")
+     (println "(def" name "(to-dataset [")
      (dotimes [i 11]
-       (let [s (* i 10.0)
-             startbeat (metro-start vrm)
-             st (long (vr-metro-time vrm s))
-             dst (* 0.001 (- st startbeat))
-             sb (vr-metro-beat vrm st)]
+       (let [cur-beat (* i 10.0)
+             start-tick  (metro-start vrm)
+             start-tick2 (metro-start vrm2)
+             cur-tick    (long (vr-metro-time vrm cur-beat))
+             cur-tick2   (long (vr-metro-time vrm2 cur-beat))
+             delta-time (* 0.001 (- cur-tick start-tick))
+             delta-time2 (* 0.001 (- cur-tick2 start-tick2))
+             calc-beat (vr-metro-beat vrm cur-tick)
+             calc-beat2 (vr-metro-beat vrm2 cur-tick2)
+             delta-beat (- calc-beat2 calc-beat)
+             ]
          ;;(println (format "%.2f %.3f %.3f %.3f %s"
          ;;                 s dst sb (Math/abs (- s sb)) (< (Math/abs (- s sb)) 0.01)))
-         (println (format "{\"beat\" %.2f \"time\" %.3f \"beat2\" %.3f \"delta\" %.3f}"
-                          s dst sb (Math/abs (- s sb))))
+         (println (format "{\"beat\" %.2f \"time\" %.3f \"time2\" %.3f \"calc-beat\" %.3f \"calc-beat2\" %.3f \"dbeat\" %.3f }"
+                          cur-beat delta-time delta-time2 calc-beat calc-beat2 delta-beat))
          ))
      (println "]))")
      )
-   (test-b-t vrm)
+   (def vrm (vr-metronome #(pwl-fn [0.0 60.0 110.0 180.0] %)))
+   (def vrm2 (pwl-metronome [0.0 60.0 110.0 180.0]))
+   (test-b-t "dfaster" vrm vrm2)
+   (def vrm (vr-metronome #(pwl-fn [0.0 60.0 110.0 20.0] %)))
+   (def vrm2 (pwl-metronome [0.0 60.0 110.0 20.0]))
+   (test-b-t "dslower" vrm vrm2)
 
    ;; incanter stuff...
    (use '(incanter core charts))
-   (with-data ds
-     (doto (xy-plot :time :beat)
-       (add-lines :time :beat2)
+   (with-data dfaster
+     (doto (xy-plot :time :calc-beat2 :series-label "good" :legend true)
+       (add-lines :time :calc-beat :series-label "bad")
+       (add-lines :time :dbeat :series-label "delta")
        (view)))
 
    ;; use 0 60bpm 100 120bpm => 0 1bps 100 2bps
