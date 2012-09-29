@@ -5,6 +5,7 @@
                   ;;[overtone "0.7.1"]
                   [overtone "0.8.0-SNAPSHOT"]
                   [quil "1.5.0"]
+                  [oversampler "0.2.0-SNAPSHOT"]
                   ]
   :plugins [ [lein-swank "1.4.4"] ]
   )

@@ -47,13 +47,36 @@ has what I needed to do:
 
    M-x list-packages 
    select & install clojure-mode  
+   *NEW* select & install nrepl
+   ;; must have also installed these along the way...
+   ;; after switch to nrepl, I don't know if they are necessary
+   swank-clojure
+   slime & slime-repl
 
    Have not tried the live-coding in emacs config...
    TODO https://github.com/overtone/live-coding-emacs.git
 
 Startup in emacs
 
-Option 1:
+New Method:
+ 
+  Use shell + emacs in order to see stderr results in the shell.
+  Without this, I don't know where these results go.
+
+  $ cd .../explore_overtone
+  $ lein repl
+
+  In emacs
+  M-x nrepl
+  <enter> ;; server must default to localhost
+  51471   ;; need to figure out how to configure this
+  ;; now you are connected.  hack away
+  ...
+  ??? how to exit this doesn't work well (System/exit 0) 
+
+Swank has been deprecated...but this still works for me.  I actually like it better for the moment.
+
+Deprecated Option 1:
   $ cd .../explore_overtone
   $ lein swank
 
@@ -65,7 +88,7 @@ Option 1:
   ...
   (System/exit 0)
 
-Option 2:
+Deprecated Option 2:
   In emacs
   go to explore_overtone dir in dired
   M-x clojure-jack-in
@@ -109,6 +132,10 @@ Option 2:
   Who would have thought that musical tempo involved calculus & differential equations?
 
   https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/my_rhythm.clj
+
+* A bit of "Take 5" to see how the piano & cello sound from oversampler.
+
+  https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/take5.clj
 
 # Questions & Answers
 
