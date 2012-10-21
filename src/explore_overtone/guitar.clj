@@ -1,7 +1,7 @@
 (ns explore_overtone.guitar)
 ;; A Simple Guitar by Roger Allen.
 ;; ----------------------------------------------------------------------
-;; (use 'overtone.live)
+(use 'overtone.live)
 
 (def guitar-chord-frets
   ;; a map of chords to frets.
@@ -62,41 +62,72 @@
    :Cadd9 [ -1  3  2  0  3  3 ]
    :Dsus4 [ -1 -1  0  2  3  3 ]
    })
-;; (guitar-chord-offset-map :E9) (guitar-chord-offset-map :E)
 
-;; the guitar string instrument is not freed.  Needs to be reset with
+;; the guitar string instrument is not freed.  Needs to be silenced with
 ;; a gate ->0 transition before a gate -> 1 transition activates it.
-;; testing showed it needed something > 25 ms between transitions, too.
-(definst guitar-string-inst 
-  [note  60
-   amp   0.5
-   dur   15.0
-   decay 30
-   coef  0.3
-   gate  1]
-  (let [freq  (midicps note)
-        noize (* 0.8 (pink-noise))
-        dly   (/ 1.0 freq)
-        plk   (pluck noize gate (/ 1.0 40.0) dly decay coef)]
-    (* amp (env-gen (perc 0.0001 dur) :gate gate ) plk)))
+;; testing showed it needed something > 25 ms between these transitions.
+;; output is sent on a bus, so that it can be mixed together with
+;; the other strings.
+(defsynth guitar-string-synth
+  [out-bus   {:default 16 :rate :ar}
+   note      {:default 60 :min 0 :max 127}
+   dur       {:default 10.0}
+   decay     {:default 30} ;; pluck decay
+   coef      {:default 0.3 :min -1 :max 1} ;; pluck coef
+   noise-amp {:default 0.8 :min 0.0 :max 1.0}
+   gate      {:default 1}]
+  (let [frq  (midicps note)
+        nze  (* noise-amp (pink-noise))
+        dly  (/ 1.0 frq)
+        plk  (pluck nze gate (/ 1.0 8.0) dly decay coef)
+        snd   (* plk (env-gen (perc 0.0001 dur) :gate gate ))]
+    (out out-bus snd)))
 
+;; the "amp" in the guitar that mixes the strings together
+;; and adds optional distortion.
+(defsynth guitar-synth [in-bus-0 {:default 16 :rate :ar}
+                        in-bus-1 {:default 16 :rate :ar}
+                        in-bus-2 {:default 16 :rate :ar}
+                        in-bus-3 {:default 16 :rate :ar}
+                        in-bus-4 {:default 16 :rate :ar}
+                        in-bus-5 {:default 16 :rate :ar}
+                        pre-amp  {:default 1.0}
+                        amp      {:default 1.0}
+                        distort  {:default 0.0 :min 0.0 :max 0.9999999999}]
+  (let [src (* pre-amp (mix [(in in-bus-0 1) (in in-bus-1 1) (in in-bus-2 1)
+                             (in in-bus-3 1) (in in-bus-4 1) (in in-bus-5 1)]))
+        ;; distortion from fx-distortion2 
+        k (/ (* 2 distort) (- 1 distort))
+        dis (/ (* src (+ 1 k)) (+ 1 (* k (abs src))))]
+    (out 0 (pan2 (* amp dis) 0))))
+
+;; create the individual string busses & synths -- defonce?
+(def guitar-string-bus-0 (audio-bus))
+(def guitar-string-bus-1 (audio-bus))
+(def guitar-string-bus-2 (audio-bus))
+(def guitar-string-bus-3 (audio-bus))
+(def guitar-string-bus-4 (audio-bus))
+(def guitar-string-bus-5 (audio-bus))
+(def guitar-string-0 (guitar-string-synth :position :head guitar-string-bus-0 :gate 0))
+(def guitar-string-1 (guitar-string-synth :position :head guitar-string-bus-1 :gate 0))
+(def guitar-string-2 (guitar-string-synth :position :head guitar-string-bus-2 :gate 0))
+(def guitar-string-3 (guitar-string-synth :position :head guitar-string-bus-3 :gate 0))
+(def guitar-string-4 (guitar-string-synth :position :head guitar-string-bus-4 :gate 0))
+(def guitar-string-5 (guitar-string-synth :position :head guitar-string-bus-5 :gate 0))
+(def guitar-string-synths [guitar-string-0 guitar-string-1 guitar-string-2
+                           guitar-string-3 guitar-string-4 guitar-string-5])
 ;; an array of 6 guitar strings: EADGBE
-(def guitar-string-notes [(note :e2)
-                          (note :a2)
-                          (note :d3)
-                          (note :g3)
-                          (note :b3)
-                          (note :e4)])
+(def guitar-string-notes [(note :e2) (note :a2) (note :d3)
+                          (note :g3) (note :b3) (note :e4)])
 
-(def guitar-string-insts  [(guitar-string-inst :gate 0)
-                           (guitar-string-inst :gate 0)
-                           (guitar-string-inst :gate 0)
-                           (guitar-string-inst :gate 0)
-                           (guitar-string-inst :gate 0)
-                           (guitar-string-inst :gate 0)])
+;; connect up the the full instrument
+(def guitar (guitar-synth :position :tail
+                          guitar-string-bus-0 guitar-string-bus-1 guitar-string-bus-2
+                          guitar-string-bus-3 guitar-string-bus-4 guitar-string-bus-5))
 
-;; given a fret-offset, add to the base note index with special handling for -1
-(defn fret-to-note
+
+;; Given a fret-offset, add to the base note index with special handling for -1
+(defn- fret-to-note
   [base-note offset]
   (if (>= offset 0)
     (+ base-note offset)
@@ -106,16 +137,15 @@
   [string-index fret amp t]
   (let [the-note (fret-to-note (nth guitar-string-notes string-index) fret)] 
     ;; turn off the previous note
-    (at t (ctl (guitar-string-insts string-index) :gate 0))
+    (at t (ctl (guitar-string-synths string-index) :gate 0))
     ;; if part of the chord, turn on the current note
     ;; NOTE: there needs to be some time between these 
     (if (> the-note 0)
-      (at (+ t 50) (ctl (guitar-string-insts string-index) :note the-note :amp amp :gate 1)))))
+      (at (+ t 50) (ctl (guitar-string-synths string-index) :note the-note :amp amp :gate 1)))))
 
 (defn pluck-string
   [string-index fret amp]
   (pluck-string-at string-index fret amp (now)))
-;; (pluck-string 0 3 1.0)
 
 ;; strum a chord on the guitar
 (defn strum-at
@@ -144,83 +174,3 @@
      (strum-now the-chord direction 0.05 0.5))
   ([the-chord]
      (strum-now the-chord :down 0.05 0.5)))
-
-;; ======================================================================
-;; try out the guitar...
-(strum-now :E)
-(strum-now :E :up)
-(strum-now :E :down 0.5)
-(strum-now :E :up 0.5 0.25)
-
-;; a little strumming pattern fun
-;; http://www.youtube.com/watch?v=DV1ANPOYuH8
-;; http://www.guitar.gg/strumming.html
-(defn pat0 [metro cur-measure chord pattern]
-  (let [cur-beat (* 4 cur-measure)]
-    (doall
-     (doseq [[b d] pattern]
-       (strum-at (metro (+ b cur-beat)) chord d)))))
-(defn dduud [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [1.5 :up] [2.5 :up]
-          [3.0 :down] ]))
-(defn dduudu [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [1.5 :up] [2.5 :up]
-          [3.0 :down]
-          [3.5 :up] ]))
-(defn ddudu [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [2.5 :up] [3.0 :down] [3.5 :up] ]))
-(defn ddduduud [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [2.0 :down] [2.25 :up] [2.5 :down] [2.75 :up]
-          [3.25 :up] [3.5 :down]]))
-(do ;; strumming practice
-  (let [metro (metronome 100)
-        now (metro)]
-    (doall
-     (doseq [[i c] (map-indexed vector [:Gadd5 :Gadd5 :Cadd9 :Cadd9
-                                        :Dsus4 :Dsus4 :Gadd5 :Cadd9
-                                        :Gadd5 :Cadd9])]
-       (dduud metro i c))))
-  )
-(do ;; knocking on heaven's door
-  (let [metro (metronome 100)
-        now (metro)]
-    (doall
-     (doseq [[i c] (map-indexed vector [:Gadd5 :Dsus4 :Am :Am
-                                        :Gadd5 :Dsus4 :Am :Am
-                                        :Gadd5 :Dsus4 :Cadd9 :Cadd9])]
-       (dduudu metro i c))))
-  )
-(do ;; moar strumming practice
-  (let [metro (metronome 180)
-        now (metro)]
-    (doall
-     (doseq [[i c] (map-indexed vector [:Gadd5 :Cadd9 :Gadd5 :Cadd9])]
-       (ddudu metro i c))))
-  )
-(do ;; evin moar strumming practice
-  (let [metro (metronome 90)
-        now (metro)]
-    (doall
-     (doseq [[i c] (map-indexed vector [:Gadd5 :Cadd9 :Gadd5 :Cadd9])]
-       (ddduduud metro i c))))
-  )
-
-;; ======================================================================
-;; FIXME -- this isn't quite working at the moment
-;; now, add some distortion...
-;; (def fxd (inst-fx! guitar-string-inst fx-distortion))
-;; adjust a bit...
-;; (ctl fxd :boost 10.5)
-;; (ctl fxd :level 0.1)
-;; (strum-now :E)
-
-
-
