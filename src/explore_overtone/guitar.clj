@@ -80,7 +80,7 @@
         nze  (* noise-amp (pink-noise))
         dly  (/ 1.0 frq)
         plk  (pluck nze gate (/ 1.0 8.0) dly decay coef)
-        snd   (* plk (env-gen (perc 0.0001 dur) :gate gate ))]
+        snd   (* plk (env-gen (asr 0.0001 1 0.1) :gate gate ))]
     (out out-bus snd)))
 
 ;; the "amp" in the guitar that mixes the strings together
