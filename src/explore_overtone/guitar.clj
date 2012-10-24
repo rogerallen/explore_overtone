@@ -6,7 +6,8 @@
         [overtone.sc.cgens mix]))
 
 ;; a map of chords to frets.
-;; -1 indicates you don't play that string
+;; -1 indicates you mute that string
+;; -2 indicates you leave that string alone
 (def guitar-chord-frets
   {:C   [ -1  3  2  0  1  0 ]
    :F   [ -1 -1  3  2  1  1 ]
@@ -67,8 +68,7 @@
 
 ;; ======================================================================
 ;; an array of 6 guitar strings: EADGBE
-(def guitar-string-notes [(note :e2) (note :a2) (note :d3)
-                          (note :g3) (note :b3) (note :e4)])
+(def guitar-string-notes (map note [:e2 :a2 :d3 :g3 :b3 :e4]))
 
 (defn- fret-to-note
   "given a fret-offset, add to the base note index with special
@@ -107,17 +107,36 @@
 ;; ======================================================================
 (defn strum
   "strum a chord on the guitar instrument in a direction (:up
-   or :down) with a strum duration of strum-time at t."
+   or :down) with a strum duration of strum-time at t.  If the-chord
+   is a vector, use it directly for fret indexes.  Code gets a bit
+   complicated to deal with the case where strings are muted and don't
+   count towards the strum-time."
   ([the-guitar the-chord direction strum-time t]
-     ;; FIXME - deal with -1 fret offsets--shouldn't count as part of
-     ;; the delta time.
-     (let [dt (* 1000 (/ strum-time 5))
+     (let [;; [-1 3 2 0 1 0]
            chord-frets (if (vector? the-chord)
+                         ;; FIXME -- assert len(the-chord) == 6?
                          the-chord ; treat the chord as a series of frets
-                         (guitar-chord-frets the-chord))]
+                         (guitar-chord-frets the-chord))
+           ;; account for unplayed strings for delta time calc
+           ;; (0 0 1 2 3 4)
+           fret-times (map first
+                           (rest (reductions
+                                  #(vector (if (>= (second %1) 0)
+                                             (inc (first %1))
+                                             (first %1))
+                                           %2)
+                                  [0 -1]
+                                  chord-frets)))]
        (dotimes [i 6]
-         (let [j (if (= direction :up) (- 5 i) i)]
-           (pick the-guitar j (chord-frets j) (+ t (* i dt)))))))
+         (let [j (if (= direction :up) (- 5 i) i)
+               max-t (apply max fret-times)
+               dt (if (> max-t 0)
+                    (* 1000 (/ strum-time max-t))
+                    0)
+               fret-delta (if (= direction :up)
+                            (- max-t (nth fret-times i))
+                            (nth fret-times i))]
+           (pick the-guitar j (nth chord-frets j) (+ t (* fret-delta dt)))))))
   ([the-guitar the-chord direction strum-time]
      (strum the-guitar the-chord direction strum-time (now)))
   ([the-guitar the-chord direction]
@@ -126,7 +145,7 @@
      (strum the-guitar the-chord :down 0.05 (now))))
 
 ;; ======================================================================
-;; The guitar instrument.
+;; The guitar instrument.  Now with distortion, reverb and a low-pass filter.
 ;; Note: the strings need to be silenced with a gate -> 0 transition
 ;; before a gate -> 1 transition activates it.  Testing showed it
 ;; needed > 25 ms between these transitions to be effective.
@@ -141,9 +160,15 @@
                  decay     {:default 30} ;; pluck decay
                  coef      {:default 0.3 :min -1 :max 1} ;; pluck coef
                  noise-amp {:default 0.8 :min 0.0 :max 1.0}
-                 pre-amp   {:default 1.0}
+                 pre-amp   {:default 6.0}
                  amp       {:default 1.0}
-                 distort   {:default 0.0 :min 0.0 :max 0.9999999999}]
+                 ;; by default, no distortion, no reverb, no low-pass
+                 distort   {:default 0.0 :min 0.0 :max 0.9999999999}
+                 rvb-mix   {:default 0.0 :min 0.0 :max 1.0}
+                 rvb-room  {:default 0.0 :min 0.0 :max 1.0}
+                 rvb-damp  {:default 0.0 :min 0.0 :max 1.0}
+                 lp-freq   {:default 20000}
+                 lp-rq     {:default 1.0}]
   (let [strings (map #(let [frq  (midicps (first %))
                             nze  (* noise-amp (pink-noise))
                             plk  (pluck nze
@@ -160,6 +185,8 @@
         src (* pre-amp (mix strings))
         ;; distortion from fx-distortion2 
         k   (/ (* 2 distort) (- 1 distort))
-        dis (/ (* src (+ 1 k)) (+ 1 (* k (abs src))))]
-    (* amp dis)))
+        dis (/ (* src (+ 1 k)) (+ 1 (* k (abs src))))
+        vrb (free-verb dis rvb-mix rvb-room rvb-damp)
+        fil (rlpf vrb lp-freq lp-rq)]
+    (* amp fil)))
 
