@@ -1,20 +1,21 @@
 (ns explore_overtone.guitar_examples)
 (use 'overtone.live)
-(use 'explore_overtone.guitar)
+;;(use 'explore_overtone.stringed)
+(use '[explore_overtone.guitar :as gtr])
 
 ;; ======================================================================
 ;; try out the guitar...
-(def g (guitar))
-(strum g :E :down 0.25)
-(strum g :E :up 0.75)
-(strum g :B :down 0.25)
-(strum g :A :up 0.5)
+(def g (gtr/guitar))
+(gtr/strum g :E :down 0.25)
+(gtr/strum g :E :up 0.75)
+(gtr/strum g :B :down 0.25)
+(gtr/strum g :A :up 0.5)
 ;; bow down to the power chord!
 (ctl g :pre-amp 4.0 :distort 0.99) 
-(strum g [0 2 2 -1 -1 -1])
-(strum g [3 5 5 -1 -1 -1])
+(gtr/strum g [0 2 2 -1 -1 -1])
+(gtr/strum g [3 5 5 -1 -1 -1])
 ;; mute all strings
-(strum g [-1 -1 -1 -1 -1 -1])
+(gtr/strum g [-1 -1 -1 -1 -1 -1])
 
 ;; ======================================================================
 ;; try out a bit of rhythmic accompanyment
@@ -25,7 +26,7 @@
   (let [cur-beat (* 4 cur-measure)]
     (doall
      (doseq [[b d] pattern]
-       (strum g chord d 0.05 (metro (+ b cur-beat)))))))
+       (gtr/strum g chord d 0.05 (metro (+ b cur-beat)))))))
 (defn dduud [metro cur-measure chord]
   (pat0 metro cur-measure chord
         [ [0.0 :down] [1.0 :down]
@@ -86,23 +87,23 @@
 ;; ac/dc's highway to hell intro.  turn it up! 
 (defn ddd0 []
   (let [t (now) dt 250]
-    (strum g [-1  0  2  2  2 -1] :down 0.01 (+ t (* 0 dt)))
-    (strum g [-1  0  2  2  2 -1] :up   0.01 (+ t (* 1 dt)))
-    (strum g [-1  0  2  2  2 -1] :down 0.01 (+ t (* 2 dt) 50))
-    (strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 3.5 dt)))))
+    (gtr/strum g [-1  0  2  2  2 -1] :down 0.01 (+ t (* 0 dt)))
+    (gtr/strum g [-1  0  2  2  2 -1] :up   0.01 (+ t (* 1 dt)))
+    (gtr/strum g [-1  0  2  2  2 -1] :down 0.01 (+ t (* 2 dt) 50))
+    (gtr/strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 3.5 dt)))))
 (defn ddd1 []
   (let [t (now) dt 250]
-    (strum g [ 2 -1  0  2  3 -1] :down 0.01 (+ t (* 0 dt)))
-    (strum g [ 2 -1  0  2  3 -1] :up   0.01 (+ t (* 1 dt)))
-    (strum g [ 3 -1  0  0  3 -1] :down 0.01 (+ t (* 2 dt) 50))
-    (strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 3.5 dt)))))
+    (gtr/strum g [ 2 -1  0  2  3 -1] :down 0.01 (+ t (* 0 dt)))
+    (gtr/strum g [ 2 -1  0  2  3 -1] :up   0.01 (+ t (* 1 dt)))
+    (gtr/strum g [ 3 -1  0  0  3 -1] :down 0.01 (+ t (* 2 dt) 50))
+    (gtr/strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 3.5 dt)))))
 (defn ddd2 []
   (let [t (now) dt 250]
-    (strum g [ 2 -1  0  2  3 -1] :down 0.01 (+ t (* 0 dt)))
-    (strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 1.5 dt)))
-    (strum g [-1  0  2  2  2 -1] :down 0.01 (+ t (* 2 dt)))
-    (strum g [-1  0  2  2  2 -1] :up   0.01 (+ t (* 3 dt)))
-    (strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 4.5 dt)))))
+    (gtr/strum g [ 2 -1  0  2  3 -1] :down 0.01 (+ t (* 0 dt)))
+    (gtr/strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 1.5 dt)))
+    (gtr/strum g [-1  0  2  2  2 -1] :down 0.01 (+ t (* 2 dt)))
+    (gtr/strum g [-1  0  2  2  2 -1] :up   0.01 (+ t (* 3 dt)))
+    (gtr/strum g [-1 -1 -1 -1 -1 -1] :down 0.01 (+ t (* 4.5 dt)))))
 
 (ctl g :pre-amp 5.0 :distort 0.96
      :lp-freq 5000 :lp-rq 0.25

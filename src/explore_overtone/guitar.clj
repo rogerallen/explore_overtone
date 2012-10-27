@@ -1,6 +1,8 @@
 ;; A Guitar by Roger Allen.
 (ns explore_overtone.guitar
-  (:use [overtone.music pitch time]
+  (:use [explore_overtone.stringed]
+        [explore_overtone.stringed_player]
+        [overtone.music pitch]      
         [overtone.studio inst]
         [overtone.sc envelope node server ugens]
         [overtone.sc.cgens mix]))
@@ -70,123 +72,11 @@
 ;; an array of 6 guitar strings: EADGBE
 (def guitar-string-notes (map note [:e2 :a2 :d3 :g3 :b3 :e4]))
 
-(defn- fret-to-note
-  "given a fret-offset, add to the base note index with special
-  handling for -1"
-  [base-note offset]
-  (if (>= offset 0)
-    (+ base-note offset)
-    offset))
-
-(defn- mkarg
-  "useful for making arguments for the guitar strings"
-  [s i]
-  (keyword (format "%s-%d" s i)))
+;; ======================================================================
+;; Main helper functions.  Use pick or strum to play the ukelele instrument.
+(def pick (partial pick-string guitar-string-notes))
+(def strum (partial strum-strings guitar-chord-frets guitar-string-notes))
 
 ;; ======================================================================
-;; Main helper functions.  Use pick or strum to play the guitar instrument.
-(defn pick
-  "pick the guitar instrument's string depending on the fret
-   selected.  A fret value less than -1 will cause no event; -1 or
-   greater causes the previous note to be silenced; 0 or greater will
-   also cause a new note event."
-  ([the-guitar string-index fret t]
-     (let [the-note (fret-to-note (nth guitar-string-notes string-index) fret)] 
-       ;; turn off the previous note
-       (if (>= the-note -1)
-         (at t (ctl the-guitar (mkarg "gate" string-index) 0)))
-       ;; NOTE: there needs to be some time between these
-       ;; FIXME: +50 seems conservative.  Find minimum.
-       (if (>= the-note 0)
-         (at (+ t 50) (ctl the-guitar
-                           (mkarg "note" string-index) the-note
-                           (mkarg "gate" string-index) 1)))))
-  ([the-guitar string-index fret]
-     (pick the-guitar string-index fret (now))))
-
-;; ======================================================================
-(defn strum
-  "strum a chord on the guitar instrument in a direction (:up
-   or :down) with a strum duration of strum-time at t.  If the-chord
-   is a vector, use it directly for fret indexes.  Code gets a bit
-   complicated to deal with the case where strings are muted and don't
-   count towards the strum-time."
-  ([the-guitar the-chord direction strum-time t]
-     (let [;; [-1 3 2 0 1 0]
-           chord-frets (if (vector? the-chord)
-                         ;; FIXME -- assert len(the-chord) == 6?
-                         the-chord ; treat the chord as a series of frets
-                         (guitar-chord-frets the-chord))
-           ;; account for unplayed strings for delta time calc
-           ;; (0 0 1 2 3 4)
-           fret-times (map first
-                           (rest (reductions
-                                  #(vector (if (>= (second %1) 0)
-                                             (inc (first %1))
-                                             (first %1))
-                                           %2)
-                                  [0 -1]
-                                  chord-frets)))]
-       (dotimes [i 6]
-         (let [j (if (= direction :up) (- 5 i) i)
-               max-t (apply max fret-times)
-               dt (if (> max-t 0)
-                    (* 1000 (/ strum-time max-t))
-                    0)
-               fret-delta (if (= direction :up)
-                            (- max-t (nth fret-times i))
-                            (nth fret-times i))]
-           (pick the-guitar j (nth chord-frets j) (+ t (* fret-delta dt)))))))
-  ([the-guitar the-chord direction strum-time]
-     (strum the-guitar the-chord direction strum-time (now)))
-  ([the-guitar the-chord direction]
-     (strum the-guitar the-chord direction 0.05 (now)))
-  ([the-guitar the-chord]
-     (strum the-guitar the-chord :down 0.05 (now))))
-
-;; ======================================================================
-;; The guitar instrument.  Now with distortion, reverb and a low-pass filter.
-;; Note: the strings need to be silenced with a gate -> 0 transition
-;; before a gate -> 1 transition activates it.  Testing showed it
-;; needed > 25 ms between these transitions to be effective.
-;; Use the strum and pick helpers to play the instrument.
-(definst guitar [note-0 {:default 60 :min 0 :max 127} gate-0 {:default 0}
-                 note-1 {:default 60 :min 0 :max 127} gate-1 {:default 0}
-                 note-2 {:default 60 :min 0 :max 127} gate-2 {:default 0}
-                 note-3 {:default 60 :min 0 :max 127} gate-3 {:default 0}
-                 note-4 {:default 60 :min 0 :max 127} gate-4 {:default 0}
-                 note-5 {:default 60 :min 0 :max 127} gate-5 {:default 0}
-                 dur       {:default 10.0}
-                 decay     {:default 30} ;; pluck decay
-                 coef      {:default 0.3 :min -1 :max 1} ;; pluck coef
-                 noise-amp {:default 0.8 :min 0.0 :max 1.0}
-                 pre-amp   {:default 6.0}
-                 amp       {:default 1.0}
-                 ;; by default, no distortion, no reverb, no low-pass
-                 distort   {:default 0.0 :min 0.0 :max 0.9999999999}
-                 rvb-mix   {:default 0.0 :min 0.0 :max 1.0}
-                 rvb-room  {:default 0.0 :min 0.0 :max 1.0}
-                 rvb-damp  {:default 0.0 :min 0.0 :max 1.0}
-                 lp-freq   {:default 20000}
-                 lp-rq     {:default 1.0}]
-  (let [strings (map #(let [frq  (midicps (first %))
-                            nze  (* noise-amp (pink-noise))
-                            plk  (pluck nze
-                                        (second %)
-                                        (/ 1.0 8.0)
-                                        (/ 1.0 frq)
-                                        decay
-                                        coef)]
-                        (leak-dc (* plk (env-gen (asr 0.0001 1 0.1)
-                                                 :gate (second %)))
-                                 0.995))
-                     [[note-0 gate-0] [note-1 gate-1] [note-2 gate-2]
-                      [note-3 gate-3] [note-4 gate-4] [note-5 gate-5]])
-        src (* pre-amp (mix strings))
-        ;; distortion from fx-distortion2 
-        k   (/ (* 2 distort) (- 1 distort))
-        dis (/ (* src (+ 1 k)) (+ 1 (* k (abs src))))
-        vrb (free-verb dis rvb-mix rvb-room rvb-damp)
-        fil (rlpf vrb lp-freq lp-rq)]
-    (* amp fil)))
-
+;; Create the guitar definst.  Now via the power of macros
+(gen-stringed-inst guitar 6)
