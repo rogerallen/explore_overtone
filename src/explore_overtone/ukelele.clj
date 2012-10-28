@@ -10,8 +10,7 @@
 ;; -1 indicates you mute that string
 ;; -2 indicates you leave that string alone
 (def ukelele-chord-frets
-  {
-   :A    [ 2  1  0  0 ]
+  {:A    [ 2  1  0  0 ]
    :A7   [ 0  1  0  0 ]
    :Am   [ 2  0  0  0 ]
    :Am7  [ 0  0  0  0 ]
