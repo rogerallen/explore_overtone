@@ -1,7 +1,6 @@
 (ns explore_overtone.guitar_examples)
 (use 'overtone.live)
-;;(use 'explore_overtone.stringed)
-(use '[explore_overtone.guitar :as gtr])
+(require '[explore_overtone.guitar :as gtr])
 
 ;; ======================================================================
 ;; try out the guitar...

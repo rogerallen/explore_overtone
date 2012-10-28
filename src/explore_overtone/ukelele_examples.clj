@@ -1,6 +1,6 @@
 (ns explore_overtone.ukelele_examples)
 (use 'overtone.live)
-(require :reload-all '[explore_overtone.ukelele :as uke])
+(require '[explore_overtone.ukelele :as uke])
 
 ;; ======================================================================
 ;; try out the ukelele...hmm, maybe needs a high-pass filter?
