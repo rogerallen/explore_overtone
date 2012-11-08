@@ -1,6 +1,6 @@
-(ns explore_overtone.guitar_examples)
-(use 'overtone.live)
-(require '[explore_overtone.guitar :as gtr])
+(ns explore_overtone.guitar_examples
+  (:use [overtone.live])
+  (:require [explore_overtone.guitar :as gtr]))
 
 ;; ======================================================================
 ;; try out the guitar...
@@ -20,67 +20,50 @@
 ;; try out a bit of rhythmic accompanyment
 ;; http://www.youtube.com/watch?v=DV1ANPOYuH8
 ;; http://www.guitar.gg/strumming.html
-;; FIXME -- these strumming patterns need a better treatment
-(defn pat0 [metro cur-measure chord pattern]
+(defn pattern-to-beat-strum-seq
+  "given a string describing a one-measure up/down strum pattern like
+  'ud-udu-', return a sequence of vector [beats :up/:down] pairs"
+  [cur-pattern]
+  (let [strums-per-measure (count cur-pattern)
+        beats-per-measure 4.0
+        beats-per-strum (/ beats-per-measure strums-per-measure)
+        ud-keywords {\u :up, \d :down}]
+    (for [[i s] (map-indexed vector cur-pattern)]
+      (when (contains? ud-keywords s)
+        [(* i beats-per-strum) (ud-keywords s)]))))
+(defn strum-pattern [the-guitar metro cur-measure cur-chord cur-pattern]
   (let [cur-beat (* 4 cur-measure)]
     (doall
-     (doseq [[b d] pattern]
-       (gtr/strum g chord d 0.05 (metro (+ b cur-beat)))))))
-(defn dduud [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [1.5 :up] [2.5 :up]
-          [3.0 :down] ]))
-(defn dduudu [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [1.5 :up] [2.5 :up]
-          [3.0 :down]
-          [3.5 :up] ]))
-(defn ddudu [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [2.5 :up] [3.0 :down] [3.5 :up] ]))
-(defn ddduduud [metro cur-measure chord]
-  (pat0 metro cur-measure chord
-        [ [0.0 :down] [1.0 :down]
-          [2.0 :down] [2.25 :up] [2.5 :down] [2.75 :up]
-          [3.25 :up] [3.5 :down]]))
+     (doseq [[b d] (pattern-to-beat-strum-seq cur-pattern)]
+       (when-not (= b nil)
+         (gtr/strum the-guitar cur-chord d 0.07 (metro (+ b cur-beat))))))))
 
 ;; now we play...
 (ctl g :pre-amp 10.0 :amp 1.0 :distort 0.0)
 (do ;; strumming practice
-  (let [metro (metronome 100)
-        now (metro)]
+  (let [metro (metronome 100)]
     (doall
      (doseq [[i c] (map-indexed vector [:Gadd5 :Gadd5 :Cadd9 :Cadd9
                                         :Dsus4 :Dsus4 :Gadd5 :Cadd9
                                         :Gadd5 :Cadd9])]
-       (dduud metro i c))))
-  )
+       (strum-pattern g metro i c "d-du-ud-")))))
 (do ;; knocking on heaven's door
-  (let [metro (metronome 100)
-        now (metro)]
+  (let [metro (metronome 100)]
     (doall
      (doseq [[i c] (map-indexed vector [:Gadd5 :Dsus4 :Am :Am
                                         :Gadd5 :Dsus4 :Am :Am
                                         :Gadd5 :Dsus4 :Cadd9 :Cadd9])]
-       (dduudu metro i c))))
-  )
+       (strum-pattern g metro i c "d-du-udu")))))
 (do ;; moar strumming practice
-  (let [metro (metronome 180)
-        now (metro)]
+  (let [metro (metronome 180)]
     (doall
      (doseq [[i c] (map-indexed vector [:Gadd5 :Cadd9 :Gadd5 :Cadd9])]
-       (ddudu metro i c))))
-  )
-(do ;; evan moar strumming practice
-  (let [metro (metronome 90)
-        now (metro)]
+       (strum-pattern g metro i c "d-d--udu")))))
+(do ;; evan moar strumming practice--16th notes.
+  (let [metro (metronome 90)]
     (doall
      (doseq [[i c] (map-indexed vector [:Gadd5 :Cadd9 :Gadd5 :Cadd9])]
-       (ddduduud metro i c))))
-  )
+       (strum-pattern g metro i c "d---d---dudu-ud-")))))
 
 ;; ======================================================================
 ;; ac/dc's highway to hell intro.  turn it up! 
@@ -110,3 +93,32 @@
 (ddd0)
 (ddd1) ;; repeat 3 times
 (ddd2)
+
+;; ======================================================================
+;; one chord progression to rule them all
+;; The I - V - vi - IV
+;; (or C - G - Am - F)
+(ctl g :pre-amp 4.0 :distort 0.5 :noise-amp 1.0
+     :lp-freq 4000 :lp-rq 2.0
+     :rvb-mix 0.45 :rvb-room 0.4 :rvb-damp 0.9)
+(defn play1 [metro k N chord-list]
+   (dotimes [n N]
+     (doseq [[i cur-chord] (map-indexed vector chord-list)]
+       (let [cur-dir (choose [:up :down])
+             cur-pattern (choose ["d-du-ud-"
+                                  "d-du-udu"
+                                  "d-d--udu"])]
+         (strum-pattern g metro (+ k (* 4 n) i) cur-chord cur-pattern)))))
+;; every pop song ever written.  beat it to death!
+(doall
+ (let [metro (metronome 80)]
+   (play1 metro 0 4 [:C :G :Am :F])))
+;; okay, change it up a bit
+(doall
+ (let [metro (metronome 80)]
+   (play1 metro 0 1 [:C :G :Am :F])
+   (play1 metro 4 1 [:Am :F :C :G])
+   (play1 metro 8 1 [:C :G :Am :F])
+   (play1 metro 12 1 [:C :G :Em :C])
+   ))
+
