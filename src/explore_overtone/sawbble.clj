@@ -1,43 +1,58 @@
 (ns explore_overtone.sawbble
-  (:use [overtone.live]))
+  (:use [overtone.live]
+        [overtone.gui.control]))
 
 ;; Rewriting this to go step-by-step into creating a saw synth
 
 ;; ======================================================================
-;; Step 1 - the basic synth 
+;; a helpful controller for playing with the synths
+(defn run-synth [the-synth]
+  (let [the-instance (the-synth)
+        the-watchers (map 
+                      (fn [param] 
+                        (add-watch
+                         (:value param)
+                         (keyword (:name param)) 
+                         (fn [_ _ _ val] (ctl the-instance (keyword (:name param)) val))))
+                      (:params the-synth))
+        the-controller (synth-controller the-synth)]
+    ;; pass them out of the fn to ensure they stay active
+    (vector the-instance the-watchers the-controller)
+    ))
 
+;; ======================================================================
+;; Step 1 - the basic synth 
+;;
+;; NOTE - to get this working with the GUI controller, I remove an
+;; important bit of code from the env-gen call: :action FREE.  For a
+;; "real" synth, you will want it to disappear wen the envelope goes
+;; to 0.
+;;
 (defsynth saw-synth-1
-  "a basic synth with an envelope so that we could control via a midi
-   keyboard.  When gated, or if the envelope goes to a level of 0, the
-   instrument is freed."
-  [pitch-midi         60
-   adsr-attack-time   0.1
-   adsr-decay-time    0.3
-   adsr-sustain-level 0.5
-   adsr-release-time  0.1
-   adsr-peak-level    0.7
-   adsr-curve         -4
-   gate               1.0]
+  "a basic saw synth with an envelope"
+  [pitch-midi         {:default 60  :min 40   :max 70 :step 1}
+   adsr-attack-time   {:default 0.1 :min 0.05 :max 0.5 :step 0.05}
+   adsr-decay-time    {:default 0.3 :min 0.05 :max 0.5 :step 0.05}
+   adsr-sustain-level {:default 0.5 :min 0.0  :max 1.0 :step 0.01}
+   adsr-release-time  {:default 0.1 :min 0.05 :max 0.5 :step 0.05}
+   adsr-peak-level    {:default 0.7 :min 0.0  :max 1.0 :step 0.01}
+   adsr-curve         {:default -4  :min -5   :max 5   :step 1} ;; what are valid values here?
+   gate               {:default 1.0 :min 0.0  :max 1.0 :step 1}]
   (let [pitch-freq (midicps pitch-midi)
-        saw-out (saw pitch-freq) ;; saw is stereo
+        saw-out (saw pitch-freq)
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
-                         :gate gate
-                         :action FREE)]
+                         :gate gate)]
     (out 0 (pan2 (* env-out saw-out)))))
 
-;; ======================================================================
-;; Step 1a - play with the synth
-
-;; (def saw-1 (saw-synth-1 :pitch-midi 60))
-;; (ctl saw-1 :pitch-midi 64)
-;; (ctl saw-1 :pitch-midi 63)
-;; (ctl saw-1 :pitch-midi 61)
-;; (ctl saw-1 :gate 0)
+;; play with the synth (window may "pop under")
+;; toggle the "gate" control to turn a note on & off
+(run-synth saw-synth-1)
 
 ;; ======================================================================
-;; Step 2 - mouse synth with the mouse-y controlling the pitch
+;; Step 2 - use better scale than the chromatic scale
+
 ;; create a buffer
 (def scale-buffer (buffer 16))
 ;; fill it with a scale
@@ -45,202 +60,165 @@
                vector
                (scale :d2 :minor (range 1 16)))]
   (buffer-set! scale-buffer i n))
+
 ;; synth
 (defsynth saw-synth-2
-  "a basic synth with an envelope and pitch that we control via mouse.
-   When gated, or if the envelope goes to a level of 0, the instrument
-   is freed."
-  [adsr-attack-time   0.1
-   adsr-decay-time    0.3
-   adsr-sustain-level 0.5
-   adsr-release-time  0.1
-   adsr-peak-level    0.7
-   adsr-curve         -4
-   gate               1.0]
-  (let [pitch-midi (index:kr (:id scale-buffer) (mouse-y 0 16))
+  "a basic saw synth with an envelope"
+  [pitch-index        {:default 0   :min 0    :max 15  :step 1}
+   adsr-attack-time   {:default 0.1 :min 0.05 :max 0.5 :step 0.05}
+   adsr-decay-time    {:default 0.3 :min 0.05 :max 0.5 :step 0.05}
+   adsr-sustain-level {:default 0.5 :min 0.0  :max 1.0 :step 0.01}
+   adsr-release-time  {:default 0.1 :min 0.05 :max 0.5 :step 0.05}
+   adsr-peak-level    {:default 0.7 :min 0.0  :max 1.0 :step 0.01}
+   adsr-curve         {:default -4  :min -5   :max 5   :step 1} ;; what are valid values here?
+   gate               {:default 1.0 :min 0.0  :max 1.0 :step 1}]
+  (let [pitch-midi (index:kr (:id scale-buffer) pitch-index)
         pitch-freq (midicps pitch-midi)
         saw-out (saw pitch-freq)
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
-                         :gate gate
-                         :action FREE)]
+                         :gate gate)]
     (out 0 (pan2 (* env-out saw-out)))))
 
-;; ======================================================================
-;; Step 2a - play with the synth & scale
+;; play with the synth & scale
+(run-synth saw-synth-2)
 
-;; move your mouse up & down
-;; (def saw-2 (saw-synth-2))
-;; (ctl saw-2 :gate 0)
 
 ;; ======================================================================
 ;; Step 3 - add detuned 2nd frequency
 (defsynth saw-synth-3
-  "a detuned saw synth with an envelope and pitch that we control via
-   mouse.  When gated, or if the envelope goes to a level of 0, the
-   instrument is freed."
-  [lfo-max-level      4.0
-   lfo-freq           2.0
-   adsr-attack-time   0.1
-   adsr-decay-time    0.3
-   adsr-sustain-level 0.5
-   adsr-release-time  0.1
-   adsr-peak-level    0.7
-   adsr-curve         -4
-   gate               1.0]
-  (let [pitch-midi (index:kr (:id scale-buffer) (mouse-y 0 16))
+  "a detuned saw synth with an envelope"
+  [lfo-level          {:default 2.0 :min 0.0  :max 5.0  :step 0.05}
+   lfo-freq           {:default 2.0 :min 0.0  :max 10.0 :step 0.1}
+   pitch-index        {:default 0   :min 0    :max 15   :step 1}
+   adsr-attack-time   {:default 0.1 :min 0.05 :max 0.5  :step 0.05}
+   adsr-decay-time    {:default 0.3 :min 0.05 :max 0.5  :step 0.05}
+   adsr-sustain-level {:default 0.5 :min 0.0  :max 1.0  :step 0.01}
+   adsr-release-time  {:default 0.1 :min 0.05 :max 0.5  :step 0.05}
+   adsr-peak-level    {:default 0.7 :min 0.0  :max 1.0  :step 0.01}
+   adsr-curve         {:default -4  :min -5   :max 5    :step 1} ;; what are valid values here?
+   gate               {:default 1.0 :min 0.0  :max 1.0  :step 1}]
+  (let [pitch-midi (index:kr (:id scale-buffer) pitch-index)
         pitch-freq (midicps pitch-midi)
         saw-out (saw pitch-freq)
-        lfo-out (* (mouse-x 0 lfo-max-level) (sin-osc lfo-freq))
+        lfo-out (* lfo-level (sin-osc lfo-freq))
         detuned-out (saw (+ pitch-freq lfo-out))
         saws-out (mix [saw-out detuned-out])
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
-                         :gate gate
-                         :action FREE)]
+                         :gate gate)]
     (out 0 (pan2 (* env-out saws-out)))))
 
-;; ======================================================================
-;; Step 3a - play with the synth, scale & detuning
-
-;; (def saw-3 (saw-synth-3)) ;; move your mouse up/down left/right
-;; (ctl saw-3 :lfo-max-level 8.0)
-;; (ctl saw-3 :lfo-freq 8.0)
-;; (ctl saw-3 :gate 0)
+;; play with the synth, scale & detuning (lfo-level & freq)
+(run-synth saw-synth-3)
 
 ;; ======================================================================
 ;; Step 4 - add separation delay between the stereo channels
 (defsynth saw-synth-4
-  "a detuned and stereo separated saw synth with an envelope and pitch
-   that we control via mouse.  When gated, or if the envelope goes to
-   a level of 0, the instrument is freed."  
-  [max-separation-delay 0.5
-   lfo-level            1.5
-   lfo-freq             4.0
-   adsr-attack-time     0.1
-   adsr-decay-time      0.3
-   adsr-sustain-level   0.5
-   adsr-release-time    0.1
-   adsr-peak-level      0.7
-   adsr-curve           -4
-   gate                 1.0]
-  (let [pitch-midi (index:kr (:id scale-buffer) (mouse-y 0 16))
+  "a detuned and stereo-separated saw synth with an envelope"  
+  [separation-delay   {:default 0.1 :min 0.0  :max 1.0  :step 0.01}
+   lfo-level          {:default 2.0 :min 0.0  :max 5.0  :step 0.05}
+   lfo-freq           {:default 2.0 :min 0.0  :max 10.0 :step 0.1}
+   pitch-index        {:default 0   :min 0    :max 15   :step 1}
+   adsr-attack-time   {:default 0.1 :min 0.05 :max 0.5  :step 0.05}
+   adsr-decay-time    {:default 0.3 :min 0.05 :max 0.5  :step 0.05}
+   adsr-sustain-level {:default 0.5 :min 0.0  :max 1.0  :step 0.01}
+   adsr-release-time  {:default 0.1 :min 0.05 :max 0.5  :step 0.05}
+   adsr-peak-level    {:default 0.7 :min 0.0  :max 1.0  :step 0.01}
+   adsr-curve         {:default -4  :min -5   :max 5    :step 1} ;; what are valid values here?
+   gate               {:default 1.0 :min 0.0  :max 1.0  :step 1}]
+  (let [pitch-midi (index:kr (:id scale-buffer) pitch-index)
         pitch-freq (midicps pitch-midi)
         saw-out (saw pitch-freq)
         lfo-out (* lfo-level (sin-osc lfo-freq))
         detuned-out (saw (+ pitch-freq lfo-out))
         saws-out (mix [saw-out detuned-out])
-        saws-out-2ch [saws-out (delay-c saws-out
-                                        max-separation-delay
-                                        (mouse-x 0 max-separation-delay))]
+        saws-out-2ch [saws-out (delay-c saws-out 1.0 separation-delay)] ;; FIXME 1.0 
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
-                         :gate gate
-                         :action FREE)]
+                         :gate gate)]
+    ;; NOTE -- no more pan2
     (out 0 (* env-out saws-out-2ch))))
 
-;; ======================================================================
-;; Step 4a - play with the synth, scale & stereo separation
-
-;; (def saw-4 (saw-synth-4))
-;; (ctl saw-4 :gate 0)
+;;  play with the stereo separation
+(run-synth saw-synth-4)
 
 ;; ======================================================================
 ;; Step 5 - add low-pass filter to the output
 (defsynth saw-synth-5
-  "a detuned and stereo separated saw synth with LPF, an envelope and pitch
-   that we control via mouse.  When gated, or if the envelope goes to
-   a level of 0, the instrument is freed."  
-  [lpf-min-freq       400
-   lpf-max-freq       10000
-   lpf-res            0.3
-   separation-delay   0.1
-   lfo-level          1.5
-   lfo-freq           4.0
-   adsr-attack-time   0.1
-   adsr-decay-time    0.3
-   adsr-sustain-level 0.5
-   adsr-release-time  0.1
-   adsr-peak-level    0.7
-   adsr-curve         -4
-   gate               1.0]
-  (let [pitch-midi (index:kr (:id scale-buffer) (mouse-y 0 16))
+  "a detuned and stereo-separated saw synth with a low-pass-filter."  
+  [lpf-freq           {:default 400 :min 100  :max 10000 :step 100}
+   lpf-res            {:default 0.3 :min 0.0  :max 1.0   :step 0.05}
+   separation-delay   {:default 0.1 :min 0.0  :max 1.0   :step 0.01}
+   lfo-level          {:default 2.0 :min 0.0  :max 5.0   :step 0.05}
+   lfo-freq           {:default 2.0 :min 0.0  :max 10.0  :step 0.1}
+   pitch-index        {:default 0   :min 0    :max 15    :step 1}
+   adsr-attack-time   {:default 0.1 :min 0.05 :max 0.5   :step 0.05}
+   adsr-decay-time    {:default 0.3 :min 0.05 :max 0.5   :step 0.05}
+   adsr-sustain-level {:default 0.5 :min 0.0  :max 1.0   :step 0.01}
+   adsr-release-time  {:default 0.1 :min 0.05 :max 0.5   :step 0.05}
+   adsr-peak-level    {:default 0.7 :min 0.0  :max 1.0   :step 0.01}
+   adsr-curve         {:default -4  :min -5   :max 5     :step 1} ;; what are valid values here?
+   gate               {:default 1.0 :min 0.0  :max 1.0   :step 1}]
+  (let [pitch-midi (index:kr (:id scale-buffer) pitch-index)
         pitch-freq (midicps pitch-midi)
         saw-out (saw pitch-freq)
         lfo-out (* lfo-level (sin-osc lfo-freq))
         detuned-out (saw (+ pitch-freq lfo-out))
         saws-out (mix [saw-out detuned-out])
         saws-out-2ch [saws-out (delay-c saws-out 1.0 separation-delay)]
-        lpf-freq (mouse-x lpf-min-freq lpf-max-freq 1)
         lpf-out-2ch (moog-ff saws-out-2ch lpf-freq lpf-res)
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
-                         :gate gate
-                         :action FREE)]
+                         :gate gate)]
     (out 0 (* env-out lpf-out-2ch))))
 
-;; ======================================================================
-;; Step 5a - play with the synth, scale & lpf frequency
-
-;; (def saw-5 (saw-synth-5))
-;; (ctl saw-5 :separation-delay 0.2)
-;; (ctl saw-5 :lpf-res 0.9)
-;; (ctl saw-5 :gate 0)
-
+;; play with the synth & lpf frequency
+(run-synth saw-synth-5)
 
 ;; ======================================================================
 ;; Step 6 - add lfo on the low-pass filter
 (defsynth saw-synth-6
-  "a detuned and stereo separated saw synth with LPF, an envelope and pitch
-   that we control via mouse.  When gated, or if the envelope goes to
-   a level of 0, the instrument is freed."  
-  [lpf-min-freq       2000
-   lpf-max-freq       8000
-   lpf-lfo-max-freq   10
-   lpf-res            0.3
-   separation-delay   0.1
-   lfo-level          1.5
-   lfo-freq           4.0
-   adsr-attack-time   0.1
-   adsr-decay-time    0.3
-   adsr-sustain-level 0.5
-   adsr-release-time  0.1
-   adsr-peak-level    0.7
-   adsr-curve         -4
-   gate               1.0]
-  (let [pitch-midi (index:kr (:id scale-buffer) (mouse-y 0 16))
+  "a detuned and stereo-separated saw synth with a low-pass-filter and low-pass-filter LFO."  
+  [lpf-lfo-freq       {:default 4    :min 0.0  :max 10.0  :step 0.01}
+   lpf-min-freq       {:default 400  :min 100  :max 10000 :step 100}
+   lpf-max-freq       {:default 4000 :min 100  :max 10000 :step 100}
+   lpf-res            {:default 0.3  :min 0.0  :max 1.0   :step 0.05}
+   separation-delay   {:default 0.1  :min 0.0  :max 1.0   :step 0.01}
+   lfo-level          {:default 2.0  :min 0.0  :max 5.0   :step 0.05}
+   lfo-freq           {:default 2.0  :min 0.0  :max 10.0  :step 0.1}
+   pitch-index        {:default 0    :min 0    :max 15    :step 1}
+   adsr-attack-time   {:default 0.1  :min 0.05 :max 0.5   :step 0.05}
+   adsr-decay-time    {:default 0.3  :min 0.05 :max 0.5   :step 0.05}
+   adsr-sustain-level {:default 0.5  :min 0.0  :max 1.0   :step 0.01}
+   adsr-release-time  {:default 0.1  :min 0.05 :max 0.5   :step 0.05}
+   adsr-peak-level    {:default 0.7  :min 0.0  :max 1.0   :step 0.01}
+   adsr-curve         {:default -4   :min -5   :max 5     :step 1} ;; what are valid values here?
+   gate               {:default 1.0  :min 0.0  :max 1.0   :step 1}]
+  (let [pitch-midi (index:kr (:id scale-buffer) pitch-index)
         pitch-freq (midicps pitch-midi)
         saw-out (saw pitch-freq)
         lfo-out (* lfo-level (sin-osc lfo-freq))
         detuned-out (saw (+ pitch-freq lfo-out))
         saws-out (mix [saw-out detuned-out])
         saws-out-2ch [saws-out (delay-c saws-out 1.0 separation-delay)]
-        lpf-lfo-freq (mouse-x 0 lpf-lfo-max-freq)
         lpf-freq (lin-lin (sin-osc lpf-lfo-freq) -1 1 lpf-min-freq lpf-max-freq)
         lpf-out-2ch (moog-ff saws-out-2ch lpf-freq lpf-res)
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
-                         :gate gate
-                         :action FREE)]
+                         :gate gate)]
     (out 0 (* env-out lpf-out-2ch))))
 
-;; ======================================================================
-;; Step 6a - play with the synth, scale & lpf-lfo frequency
-
-;; (def saw-6 (saw-synth-6))
-;; (ctl saw-6 :lpf-min-freq 200)
-;; (ctl saw-6 :separation-delay 0.05)
-;; (ctl saw-6 :lpf-res 0.1)
-;; (ctl saw-6 :lfo-freq 2.0)
-;; (ctl saw-6 :gate 0)
+;; play with the synth, scale & lpf-lfo frequency
+(run-synth saw-synth-6)
 
 ;; ======================================================================
-;; and here is the full synth.  FIXME reconcile the parameters
+;; and here is the full synth.  FIXME reconcile the parameters, etc.
 (defsynth sawbble-synth
   [note          60
    volume         1.0
