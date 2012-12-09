@@ -1,6 +1,6 @@
 ;; A Guitar by Roger Allen.
-(ns explore_overtone.guitar
-  (:use [explore_overtone.stringed]
+(ns explore-overtone.guitar
+  (:use [explore-overtone.stringed]
         [overtone.music pitch]      
         [overtone.studio inst]
         [overtone.sc envelope node server ugens]

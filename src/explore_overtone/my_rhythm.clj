@@ -1,4 +1,4 @@
-(ns explore_overtone.my_rhythm
+(ns explore-overtone.my-rhythm
   (:use [overtone.music time]
         [overtone.music.rhythm]))
 
@@ -400,8 +400,7 @@ points."
 #_(
    (use 'overtone.live)
    (use 'overtone.inst.sampled-piano)
-   (use 'explore_overtone.my_rhythm)
-   ;; for dev (use :reload-all 'explore_overtone.my_rhythm)
+   (use 'explore-overtone.my-rhythm)
 
    ;; ----------------------------------------------------------------------
    ;; mary

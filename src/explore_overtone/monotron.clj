@@ -1,4 +1,4 @@
-(ns explore_overtone.monotron)
+(ns explore-overtone.monotron)
 ;; Monotron Clone Attempt by Roger Allen.
 ;;
 ;; My first definst, so much could easily be wrong below...

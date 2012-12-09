@@ -1,4 +1,4 @@
-(ns explore_overtone.irrational_infinite_song)
+(ns explore-overtone.irrational-infinite-song)
 (use 'overtone.live)
 ;;(use 'overtone.core)
 ;;(connect-external-server 57110)

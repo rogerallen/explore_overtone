@@ -1,4 +1,4 @@
-(ns explore_overtone.play_with_echo)
+(ns explore-overtone.play-with-echo)
 
 ;; use TouchOSC on iPhone to play with parameters of fx-my-echo.
 ;; "mix 2" panel

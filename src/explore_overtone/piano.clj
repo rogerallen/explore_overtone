@@ -1,4 +1,4 @@
-(ns explore_overtone.piano)
+(ns explore-overtone.piano)
 ;; noodling on the built in piano instrument
 ;; piano requires external server
 ;; ----------------------------------------------------------------------

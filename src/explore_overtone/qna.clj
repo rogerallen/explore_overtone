@@ -1,5 +1,5 @@
 ;; a series of questions I have + any answers I've found so far.
-(ns explore_overtone.qna)
+(ns explore-overtone.qna)
 
 ;; ......................................................................
 ;; * how do I start overtone?

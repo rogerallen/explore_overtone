@@ -1,4 +1,4 @@
-(ns explore_overtone.piprimes)
+(ns explore-overtone.piprimes)
 (do
   (use 'overtone.core)
   (connect-external-server 57110))

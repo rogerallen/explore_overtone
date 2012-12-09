@@ -1,4 +1,4 @@
-(ns explore_overtone.quil_display
+(ns explore-overtone.quil-display
   (:use [overtone.live]
         [overtone.inst.sampled-piano])
   (:require [quil.core]))

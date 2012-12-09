@@ -1,6 +1,6 @@
 ;; A Mandolin by Roger Allen.
-(ns explore_overtone.mandolin
-  (:use [explore_overtone.stringed]
+(ns explore-overtone.mandolin
+  (:use [explore-overtone.stringed]
         [overtone.music pitch]
         [overtone.studio inst]
         [overtone.sc envelope node server ugens]

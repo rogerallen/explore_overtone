@@ -1,5 +1,5 @@
 ;; A Stringed Instrument Generator by Roger Allen with help from Sam Aaron on the macro.
-(ns explore_overtone.stringed
+(ns explore-overtone.stringed
   (:use [overtone.music pitch time]
         [overtone.studio inst]
         [overtone.sc envelope node server ugens]
