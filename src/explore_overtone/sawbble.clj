@@ -189,7 +189,8 @@
 ;; gives it yet another type of depth
 ;;
 (defsynth saw-synth-6
-  "a detuned and stereo-separated saw synth with a low-pass-filter and low-pass-filter LFO."  
+  "a detuned and stereo-separated saw synth with a low-pass-filter and
+   low-pass-filter LFO."
   [lpf-lfo-freq       {:default 4.1  :min 0.0 :max 10.0  :step 0.01}
    lpf-min-freq       {:default 400  :min 100 :max 9900  :step 100}
    lpf-max-freq       {:default 4000 :min 100 :max 10000 :step 100}

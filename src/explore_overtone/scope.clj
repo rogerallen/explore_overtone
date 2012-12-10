@@ -79,16 +79,17 @@
   will cause the crash to happen sooner. Need to remove this limitation
   when scsynth-jna is fixed."
   [s]
-  (let [{:keys [buf size width height panel y-arrays x-array sliders]} s
+  (let [{:keys [buf buf2 size width height panel y-arrays x-array sliders]} s
         [x-slider y-slider t-slider] sliders
         frames    (if @(:update? s) (buffer-data buf) @(:frames s))
+        frames2   (if @(:update? s) (buffer-data buf2) @(:frames s)) ;; FIXME :frames?
         step      (control/scale-val
                    [0 99]
                    [0.25 (/ (buffer-size buf) width)]
                    (.getValue x-slider))
         y-scale   (- height (* 2 Y-PADDING))
         trigger-level (scale-trigger-slider (.getValue t-slider))
-        [y-a y-b] @y-arrays]
+        [y-a y-b y-c y-d] @y-arrays]
 
     (when-not (empty? frames)
       (let [trigger-point (find-trigger-point frames trigger-level)]
@@ -98,11 +99,16 @@
             (aset ^ints y-b x
                   (if (>= ai SCOPE-BUF-SIZE)
                     (int 0)
-                    (int (* y-scale (aget ^floats frames ai)))))))
-        (reset! y-arrays [y-b y-a])
+                    (int (* y-scale (aget ^floats frames ai)))))
+            (aset ^ints y-d x
+                  (if (>= ai SCOPE-BUF-SIZE)
+                    (int 0)
+                    (int (* y-scale (aget ^floats frames2 ai)))))
+            ))
+        (reset! y-arrays [y-b y-a y-d y-c]) ;; swap front/back
         (.repaint panel)))
 
-    (when (and (not (:bus-synth s))
+    (when (and (not (:bus-synth s)) ;; FIXME stereo?
                @(:update? s))
       (reset! (:frames s) frames)
       (reset! (:update? s) false))))
@@ -120,7 +126,7 @@
                    (+ 1 (* 0.1 (- sy-val 50)))
                    (+ (* 0.02 sy-val) 0.01))
           y-shift (+ (/ height 2.0) Y-PADDING)
-          [y-a y-b] @y-arrays
+          [y-a y-b y-c y-d] @y-arrays
           trigger-level (scale-trigger-slider (.getValue t-slider))
           ]
       (doto g
@@ -129,10 +135,12 @@
         (.fillRect 0 0 width height)
         (.setColor ^Color (Color. 100 100 100))
         (.drawRect 0 0 width height)
-        (.setColor ^Color color)
         (.translate 0 y-shift)
         (.scale 1 (* -1 y-zoom))
+        (.setColor ^Color color)
         (.drawPolyline ^ints x-array ^ints y-a width)
+        (.setColor ^Color (Color. 100 100 200))
+        (.drawPolyline ^ints x-array ^ints y-c width)
         (.setColor ^Color (Color. 100 200 100))
         (.drawLine 0 (* trigger-level (- height (* 2 Y-PADDING)))
                    width (* trigger-level (- height (* 2 Y-PADDING))))
@@ -179,14 +187,16 @@
   (let [width     (scope :width)
         x-array   (scope :x-array)
         height    (scope :height)
-        [y-a y-b] @(scope :y-arrays)]
+        [y-a y-b y-c y-d] @(scope :y-arrays)]
 
     (dotimes [i width]
       (aset x-array i i))
 
     (dotimes [i width]
       (aset y-a i (/ (- height (* 2 Y-PADDING)) 2))
-      (aset y-b i (/ (- height (* 2 Y-PADDING)) 2)))))
+      (aset y-b i (/ (- height (* 2 Y-PADDING)) 2))
+      (aset y-c i (/ (- height (* 2 Y-PADDING)) 2))
+      (aset y-d i (/ (- height (* 2 Y-PADDING)) 2)))))
 
 (defn- empty-scope-data
   []
@@ -208,12 +218,18 @@
   "Set a bus to view in the scope."
   [s]
   (let [buf (buffer SCOPE-BUF-SIZE)
-        bus-synth (start-bus-synth (:num s) buf)]
+        buf2 (buffer SCOPE-BUF-SIZE)
+        bus-synth (start-bus-synth (:num s) buf)
+        bus-synth2 (start-bus-synth (inc (:num s)) buf2)
+        ]
     (assoc s
       :size SCOPE-BUF-SIZE
       :bus-synth bus-synth
-      :buf buf)))
+      :bus-synth2 bus-synth2
+      :buf buf
+      :buf2 buf2)))
 
+;; FIXME – not updated for stereo!
 (defn- scope-buf
   "Set a buffer to view in the scope."
   [s]
@@ -227,11 +243,16 @@
   by handling timeout errors when killing the scope's bus-synth."
   [s]
   (log/info (str "Closing scope: \n" s))
-  (let [{:keys [id bus-synth buf]} s]
+  (let [{:keys [id bus-synth bus-synth2]} s]
     (when (and bus-synth
                (server-connected?))
       (try
         (kill bus-synth)
+        (catch Exception e)))
+    (when (and bus-synth2
+               (server-connected?))
+      (try
+        (kill bus-synth2)
         (catch Exception e)))
     (dosync (alter scopes* dissoc id))))
 
@@ -245,8 +266,10 @@
                  (JSlider. JSlider/VERTICAL 0 99 50)]
         frame (scope-frame panel sliders name keep-on-top width height)
         x-array (int-array width)
-        y-a     (int-array width)
-        y-b     (int-array width)
+        y-a     (int-array width) ;; front buffer, left channel
+        y-b     (int-array width) ;; back, left
+        y-c     (int-array width) ;; front buffer, right channel
+        y-d     (int-array width) ;; back, right
         scope {:id id
                :name name
                :size 0
@@ -260,7 +283,7 @@
                :width width
                :height height
                :x-array x-array
-               :y-arrays (atom [y-a y-b])
+               :y-arrays (atom [y-a y-b y-c y-d])
                :update? (atom true)
                :frames (atom [])}
 
@@ -275,25 +298,6 @@
         (windowIconified [this e])
         (windowOpened [this e])
         (windowClosed [this e])))
-    (comment .addComponentListener frame
-      (reify ComponentListener
-        (componentHidden [this e])
-        (componentMoved  [this e])
-        (componentResized [this e]
-          (let [w (.getWidth frame)
-                h (.getHeight frame)
-                xs (int-array w)
-                ya (int-array w)
-                yb (int-array w)]
-            (dosync
-              (let [s (get (ensure scopes*) id)
-                    s (assoc s
-                             :width w
-                             :height h
-                             :x-array xs
-                             :y-arrays (atom [ya yb]))]
-                (alter scopes* assoc id s)))))
-        (componentShown [this e])))
 
     (case kind
           :bus (scope-bus scope)
@@ -350,93 +354,3 @@
                               (map (fn [s] scope-close s) @scopes*))))
                ::stop-scopes)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Testing
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(comment
-  (require 'examples.basic)
-
-  (defonce test-frame (JFrame. "scope"))
-  (defonce _test-scope (do
-                         (.setPreferredSize test-panel (Dimension. 600 400))
-                         (.add (.getContentPane test-frame) test-panel)
-                         (.setScene test-panel (scope))
-                         (.pack test-frame)
-                         (.show test-frame)))
-
-  (defn- go-go-scope []
-    (let [b (buffer 2048)]
-      (Thread/sleep 100)
-      (scope-buf b)
-      (scope-on)
-      (examples.basic/sizzle :bus 20)
-      (bus->buf 20 (:id b))
-      (bus->bus 20 0)))
-
-  (defn- spectrogram [in-bus]
-    (let [fft-buf (buffer 2048)
-          buf (buffer 2048)]
-      (Thread/sleep 100)
-      (freq-scope-zero in-bus fft-buf buf)))
-
-  (defn test-scope []
-    (if (not (server-connected?))
-      (do
-        (boot-server)
-        (on :examples-ready go-go-scope))
-      (go-go-scope))
-    (.show test-frame))
-  )
-
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;; Spectragraph stuff to be worked on
-(comment
-                                        ; Note: The fft ugen writes into a buffer:
-                                        ; dc, nyquist, real, imaginary, real, imaginary....
-  (comment defn- update-scope []
-           (let [{:keys [buf width height panel]} @scope*
-                 frames  (buffer-data buf)
-                 n-reals (/ (- (:size buf) 2) 2)
-                 step    (int (/ n-reals width))
-                 y-scale (/ (- height (* 2 Y-PADDING)) 2)
-                 y-shift (+ (/ height 2) Y-PADDING)]
-             (dotimes [x width]
-               (aset ^ints y-array x
-                     (int (+ y-shift
-                             (* y-scale
-                                (aget ^floats frames
-                                      (+ 2 (* 2 (unchecked-multiply x step))))))))))
-           (.repaint (:panel @scope*)))
-
-  (defsynth freq-scope-zero [in-bus 0 fft-buf 0 scope-buf 1
-                             rate 4 phase 1 db-factor 0.02]
-    (let [n-samples (* 0.5 (- (buf-samples:kr fft-buf) 2))
-          signal (in in-bus)
-          freqs  (fft fft-buf signal 0.75 :hann)
-                                        ;        chain  (pv-mag-smear fft-buf 1)
-          phasor (+ (+ n-samples 2)
-                    (* n-samples
-                       (lf-saw (/ rate (buf-dur:kr fft-buf)) phase)))
-          phasor (round phasor 2)]
-      (scope-out (* db-factor (ampdb (* 0.00285 (buf-rd 1 fft-buf phasor 1 1))))
-                 scope-buf)))
-
-
-  (defsynth freqs [in-bus 10 fft-buf 0]
-    (let [n-samples (* 0.5 (- (buf-samples:kr fft-buf) 2))
-          signal    (in in-bus 1)]
-      (fft fft-buf signal 0.75 :hann)))
-
-
-
-  (defsynth scoper-outer [buf 0]
-    (scope-out (sin-osc 200) buf))
-  (scope-out)
-
-  (defn freq-scope-buf [buf]
-    )
-
-  )
