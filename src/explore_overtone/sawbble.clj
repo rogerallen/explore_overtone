@@ -6,22 +6,8 @@
 ;; Work step-by-step to create a saw synth
 
 ;; ======================================================================
-;; watch what we synthesize
+;; watch what we synthesize on an oscilloscope
 (scope :width 700 :height 500) 
-
-;; a helpful controller for playing with the synths
-(defn live-controller [the-synth]
-  (let [the-instance (the-synth)
-        the-watchers (map 
-                      (fn [param] 
-                        (add-watch
-                         (:value param)
-                         (keyword (:name param)) 
-                         (fn [_ _ _ val] (ctl the-instance (keyword (:name param)) val))))
-                      (:params the-synth))
-        the-controller (synth-controller the-synth)]
-    ;; pass them out of the fn to ensure they stay active
-    (vector the-instance the-watchers the-controller)))
 
 ;; ======================================================================
 ;; Step 1 - the basic synth 
@@ -36,7 +22,7 @@
 
 ;; play with the synth (window may "pop under")
 ;; toggle the "gate" control to turn a note on & off
-(live-controller saw-synth-1)
+(live-synth-controller saw-synth-1)
 
 ;; ======================================================================
 ;; Step 2 - use better scale than chromatic, add envelope
@@ -76,7 +62,7 @@
     (out 0 (pan2 (* env-out saw-out)))))
 
 ;; play with the synth & scale
-(live-controller saw-synth-2)
+(live-synth-controller saw-synth-2)
 
 ;; ======================================================================
 ;; Step 3 - add detuned 2nd frequency
@@ -106,7 +92,7 @@
     (out 0 (pan2 (* env-out saws-out)))))
 
 ;; play with the synth, scale & detuning (lfo-level & freq)
-(live-controller saw-synth-3)
+(live-synth-controller saw-synth-3)
 
 ;; ======================================================================
 ;; Step 4 - add separation delay between the stereo channels
@@ -143,7 +129,7 @@
     (out 0 (* env-out saws-out-2ch))))
 
 ;;  play with the stereo separation
-(live-controller saw-synth-4)
+(live-synth-controller saw-synth-4)
 
 ;; ======================================================================
 ;; Step 5 - add low-pass filter to the output
@@ -182,7 +168,7 @@
     (out 0 (* env-out lpf-out-2ch))))
 
 ;; play with the synth & lpf frequency
-(live-controller saw-synth-5)
+(live-synth-controller saw-synth-5)
 
 ;; ======================================================================
 ;; Step 6 - add lfo on the low-pass filter
@@ -222,7 +208,7 @@
     (out 0 (* env-out lpf-out-2ch))))
 
 ;; play with the synth, scale & lpf-lfo frequency
-(live-controller saw-synth-6)
+(live-synth-controller saw-synth-6)
 
 ;; ======================================================================
 ;; The full synth with some added slew on the input notes
@@ -230,8 +216,11 @@
   "a detuned and stereo-separated saw synth with a low-pass-filter and
    low-pass-filter LFO."
   [note                {:default 60   :min 0   :max 127   :step 1}
+   ;; adding velocity for (midi-poly-player)
+   velocity            {:default 1.0  :min 0.0 :max 10.0  :step 0.1}
    note-slew           {:default 15.0 :min 1.0 :max 50.0  :step 1.0}
    separation-delay-ms {:default 5.0  :min 0   :max 30.0  :step 0.1}
+   separation-phase    {:default 1    :min -1  :max 1     :step 2}
    lpf-lfo-freq        {:default 4.1  :min 0.0 :max 10.0  :step 0.01}
    lpf-min-freq        {:default 400  :min 100 :max 9900  :step 100}
    lpf-max-freq        {:default 4000 :min 100 :max 10000 :step 100}
@@ -250,15 +239,23 @@
         lfo-out (* lfo-level (sin-osc lfo-freq))
         saws-out (mix (saw [pitch-freq (+ pitch-freq lfo-out)]))
         separation-delay (/ separation-delay-ms 1000.0)
-        saws-out-2ch [saws-out (delay-c saws-out 1.0 separation-delay)]
+        saws-out-2ch [saws-out (delay-c (* separation-phase saws-out)
+                                        1.0 separation-delay)]
         lpf-freq (lin-lin (sin-osc lpf-lfo-freq) -1 1 lpf-min-freq lpf-max-freq)
         lpf-out-2ch (moog-ff saws-out-2ch lpf-freq lpf-res)
         env-out (env-gen (adsr adsr-attack-time   adsr-decay-time
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
                          :gate gate :action FREE)] ;; FREE at last!
-    (out 0 (* env-out lpf-out-2ch))))
+    (out 0 (* velocity env-out lpf-out-2ch))))
 
+;; ======================================================================
+;; midi control
+(midi-poly-player sawbble-synth)
+(synth-controller sawbble-synth)
+;; (midi-player-stop)
+
+;; ======================================================================
 ;; some things to play with...
 ;; (def sawbble (sawbble-synth))
 ;; (stop)
@@ -304,3 +301,4 @@
 (play-some slew-notes my-sawbble 1.0)
 
 (stop)
+
