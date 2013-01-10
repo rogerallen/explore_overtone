@@ -1,6 +1,7 @@
-(use 'overtone.live)
-(use 'overtone.gui.control)
-(use 'overtone.gui.scope)
+(ns explore-overtone.choir
+  (:use [overtone.live]
+        [overtone.gui.control]
+        [overtone.gui.scope]))
 
 ;; look at what you create
 (scope)
@@ -16,7 +17,7 @@
 
 (defsynth voice-1
   [note                {:default 60  :min 0    :max 127   :step 1}
-   velocity            {:default 1.0 :min 0.0  :max 1.0   :step 0.01}
+   velocity            {:default 100 :min 0    :max 127   :step 1}
    milli-q             {:default 12  :min 1    :max 200   :step 1}
    lpf-freq            {:default 1500 :min 400 :max 10000 :step 100}
    separation          {:default 9   :min 0.5  :max 20.0  :step 0.5}
@@ -27,7 +28,8 @@
    adsr-peak-level     {:default 1.0 :min 0.0  :max 1.0   :step 0.01}
    adsr-curve          {:default -1  :min -5   :max 5     :step 1}
    gate                {:default 1.0 :min 0.0  :max 1.0   :step 1}]
-  (let [n (* 10 (white-noise)) ; better than pink-noise))
+  (let [amp (/ velocity 127.0)
+        n (* 10 (white-noise)) ; better than pink-noise))
         q (/ milli-q 1000.0)
         ;; mp3 seems to have 3 "formants"
         note-freq (midicps note)
@@ -58,10 +60,13 @@
         voice-out (+ voice-out (bpf n note-freq10 q))
         voice-out (+ voice-out (bpf n note-freq11 q))
         voice-out (+ voice-out (bpf n note-freq12 q))
+        ;; FIXME -- how to do this with a shallower rolloff
         ;; now drop off the high frequencies...
-        voice-out (lpf voice-out lpf-freq)
+        ;;voice-out (lpf voice-out lpf-freq)
+        voice-out (b-low-pass voice-out lpf-freq)
         ;; and drop off some of the low freq, too.
-        voice-out (hpf voice-out (* 0.8 note-freq))
+        ;;voice-out (hpf voice-out (* 0.8 note-freq))
+        voice-out (b-hi-pass voice-out (* 0.8 note-freq))
         ;; pop in some stereo separation...
         voice-out-2ch [voice-out (* -1 voice-out)]
 ;;                       (delay-c voice-out 0.5 (/ separation 1000.0))]
@@ -70,15 +75,18 @@
                                adsr-sustain-level adsr-release-time
                                adsr-peak-level    adsr-curve)
                          :gate gate :action FREE)]
-    (out 0 (* velocity env-out voice-out-2ch))))
+    (out 0 (* amp env-out voice-out-2ch))))
 
-;; check it out...
+;; check it out with live controllers...
 (do
   (midi-poly-player voice-1)
   (synth-controller voice-1))
-
-;; when you want to reconnect
+;; when you want to recompile & reconnect, do this first
 (midi-player-stop)
+
+;; or play manually
+(def v1 (voice-1 :note 58))
+(ctl v1 :gate 0)
 
 ;; when you want to look at the output in Audacity
 (recording-start "voice-1.wav")
