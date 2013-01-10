@@ -3,18 +3,22 @@
     leipzig.melody
     leipzig.scale
     leipzig.canon)
-  (:require [overtone.live :as o]))
+  (:require [overtone.live :as o]
+            [overtone.synth.stringed :as oss]))
 
-(o/definst beep [frequency 440 duration 1]                       
-  (let [envelope (o/line 1 0 duration :action o/FREE)]
-    (* envelope (o/sin-osc frequency))))
+(defmethod note-on :leader
+  [{midi :pitch}] (-> midi (oss/ektara :gate 1)))
+(defmethod note-on :follower
+  [{midi :pitch}] (-> midi (+ 12) (oss/ektara :gate 1)))
+(defmethod note-on :bass
+  [{midi :pitch}] (-> midi (- 12) (oss/ektara :gate 1)))
 
-(defmethod play-note :leader
-  [{midi :pitch}] (-> midi o/midi->hz beep))
-(defmethod play-note :follower
-  [{midi :pitch}] (-> midi (+ 12) o/midi->hz beep))
-(defmethod play-note :bass
-  [{midi :pitch}] (-> midi (- 12) o/midi->hz beep))
+(defmethod note-off :leader
+  [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
+(defmethod note-off :follower
+  [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
+(defmethod note-off :bass
+  [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
 
 (def melody
                ; Row, row, row your boat,
@@ -47,8 +51,9 @@
     (canon (comp (simple 4)
                  (partial where :part (is :follower))))
     (where :time speed)
+    (where :duration speed)
     (where :pitch key)
-    play))
+    play2))
 
 (comment
   (row-row (bpm 120) (comp G3 ♯ major))
