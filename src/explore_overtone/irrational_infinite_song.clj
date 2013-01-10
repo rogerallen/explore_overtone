@@ -1,9 +1,6 @@
-(ns explore-overtone.irrational-infinite-song)
-(use 'overtone.live)
-;;(use 'overtone.core)
-;;(connect-external-server 57110)
-;;(use 'overtone.inst.piano)
-(use 'overtone.inst.sampled-piano) ;; requires 0.7.0. downloads 200MB
+(ns explore-overtone.irrational-infinite-song
+  (use [overtone.live]
+       [oversampler.piano.inst]))
 
 ;; pi to 1000 digits
 (def pi1000 '(3 1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3
@@ -55,18 +52,21 @@
 ;;        (take-nth 3 (nthrest digit-seq 2))))
 
 ;; change to play the first digits as pitches
-(defn digits2inotes [digit-seq]
+(defn digits2inotes
   "given a list of digits, make it into a list of index notes"
+  [digit-seq]
   (let [n (int (/ (count digit-seq) 3))]
     (map #(hash-map :pitch-index %1 :velocity-index %2 :duration-index %3)
          (take n digit-seq)
          (take n (drop n digit-seq))
          (take n (drop (* 2 n) digit-seq)))))
+;; (take 10 (digits2inotes pi1000))
 
 (defn index2pitch [tonic type index]
   "given a digit in range 0..9 find index in scale defined by
      tonic & type.  E.g. (index2pitch :c4 :major 1) -> 62"
   (nth (vec (scale tonic type (range 1 10))) (mod index 10)))
+;; (index2pitch :C2 :pentatonic 9)
 
 (defn index2velocity [index]
   "given a digit 'n' in range 0..9, find a velocity to play"
@@ -80,19 +80,17 @@
 
 (defn inote2snote [tonic type cur-inote]
   "given an index-note, create a sequence-note with a place for a beat."
-  (hash-map
-   :pitch (index2pitch tonic type (:pitch-index cur-inote))
-   :velocity (index2velocity (:velocity-index cur-inote))
-   :duration (index2duration (:duration-index cur-inote))
-   :beat 0))
+  (let [{:keys [pitch-index velocity-index duration-index]} cur-inote]
+    {:pitch (index2pitch tonic type pitch-index)
+     :velocity (index2velocity velocity-index)
+     :duration (index2duration duration-index)
+     :beat 0}))
+;; (inote2snote :C2 :major {:pitch-index 1 :velocity-index 1 :duration-index 1})
+;; 38 2 83 0
 
 (defn duration2beat [cur-snote nxt-snote]
   "given 2 sequence notes, update the nxt beat"
-  (hash-map
-   :pitch (:pitch nxt-snote)
-   :velocity (:velocity nxt-snote)
-   :duration (:duration nxt-snote)
-   :beat (+ (:duration cur-snote) (:beat cur-snote))))
+  (assoc nxt-snote :beat (+ (:duration cur-snote) (:beat cur-snote))))
 
 (defn linear-map [x0 x1 y0 y1 x]
   "given x0 -> y0.  x1 -> y1.  x maps linearly to y"
@@ -128,6 +126,7 @@
           cur-level (velocity2level (:velocity cur-snote))
           cur-dur (:duration cur-snote)
           cur-beat (+ beat (:beat cur-snote))]
+      ;;(println "cur-snote:" cur-snote)
       ;;(println "note-on:" cur-beat cur-pitch )
       (at (m cur-beat) (def pk (sampled-piano :note cur-pitch
                                               :level cur-level
@@ -135,13 +134,15 @@
       ;;(println "note-off:" (+ cur-beat (* 0.9 cur-dur)))
       (at (m (+ cur-beat (* 1.6 cur-dur))) (ctl pk :gate 0)))))
 
-;; (play-seq
-;;  (metronome 120)
-;;  0
-;;  '({:pitch 60 :velocity 100 :duration 1 :beat 0}
-;;    {:pitch 62 :velocity 100 :duration 1 :beat 1}
-;;    {:pitch 65 :velocity 100 :duration 1 :beat 2}
-;;    ))
+(comment
+  (play-seq
+   (metronome 120)
+   0
+   '({:pitch 60 :velocity 100 :duration 1 :beat 0}
+     {:pitch 62 :velocity 100 :duration 1 :beat 1}
+     {:pitch 65 :velocity 100 :duration 1 :beat 2}
+     ))
+  )
 
 (defn infinite-song [m beat tonic type]
   (println "infinite song" beat tonic type)
@@ -158,21 +159,5 @@
   
 ;; and now, we play...
 (def metro (metronome 90))
-(def pfx (inst-fx sampled-piano fx-freeverb))
-;;(def lfx (inst-fx fx-freeverb fx-rlpf))
-(def lfx (inst-fx sampled-piano fx-rlpf))
-(do
-  (ctl pfx :room-size 100)
-  (ctl pfx :dampening 0.1)
-  (ctl pfx :wet-dry   0.9) ;; dry = direct.  wet = reflections
-  (ctl lfx :cutoff 1000)
-  (ctl lfx :res 0.9)
-  )
 (infinite-song metro (metro) :c3 :pentatonic)
 ;;(stop)
-;;(clear-fx sampled-piano)
-
-;; need to do low-pass filter on the fx-freeverb output.
-;; need to get rid of high-pitched ringing
-
-;; should also try 'panning' the cutoff frequencies, etc. during music
