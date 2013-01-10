@@ -1,3 +1,13 @@
+;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;; NOTE this code has moved to overtone.examples.guitar_synth
+;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+;; keeping around for historical purposes...
+
+
+
+
+
 (ns explore-overtone.guitar-examples
   (:use [overtone.live])
   (:require [explore-overtone.guitar :as gtr]))

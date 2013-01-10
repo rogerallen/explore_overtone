@@ -1,3 +1,9 @@
+;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;; NOTE this code has moved to overtone.inst.stringed
+;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+;; keeping around for historical purposes...
+
 ;; A Guitar by Roger Allen.
 (ns explore-overtone.guitar
   (:use [explore-overtone.stringed]

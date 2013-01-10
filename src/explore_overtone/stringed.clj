@@ -1,3 +1,9 @@
+;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+;; NOTE this code has moved to overtone.synth.stringed
+;; !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+;; keeping around for historical purposes...
+
 ;; A Stringed Instrument Generator by Roger Allen with help from Sam Aaron on the macro.
 (ns explore-overtone.stringed
   (:use [overtone.music pitch time]
