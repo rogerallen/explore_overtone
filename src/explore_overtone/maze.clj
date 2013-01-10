@@ -6,9 +6,7 @@
 ;; -- Roger Allen, May 2012
 
 ;; mda piano requires external server
-(use 'overtone.core)
-;;(connect-external-server)
-(boot-external-server)
+(use 'overtone.live)
 (use 'overtone.inst.piano)
 
 ;; ======================================================================
