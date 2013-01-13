@@ -4,20 +4,29 @@
     leipzig.scale
     leipzig.canon)
   (:require [overtone.live :as o]
-            [overtone.synth.stringed :as oss]))
+            [overtone.synth.stringed :as oss]
+            [explore-overtone.sawbble :as eos]))
 
-(defmethod note-on :leader
+(defmethod play-note :leader
   [{midi :pitch}] (-> midi (oss/ektara :gate 1)))
-(defmethod note-on :follower
-  [{midi :pitch}] (-> midi (+ 12) (oss/ektara :gate 1)))
-(defmethod note-on :bass
-  [{midi :pitch}] (-> midi (- 12) (oss/ektara :gate 1)))
+(defmethod play-note :follower
+  [{midi :pitch}] (-> midi (+ 12) (eos/sawbble-synth
+                                   :lfo-freq 9.0
+                                   :lpf-lfo-freq 3.0
+                                   :amp 1.0
+                                   :adsr-sustain-level 0.9
+                                   :gate 1)))
+(defmethod play-note :bass
+  [{midi :pitch}] (-> midi (- 12) (oss/ektara
+                                   :amp 0.5
+                                   :distort 0.3
+                                   :gate 1)))
 
-(defmethod note-off :leader
+(defmethod stop-note :leader
   [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
-(defmethod note-off :follower
+(defmethod stop-note :follower
   [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
-(defmethod note-off :bass
+(defmethod stop-note :bass
   [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
 
 (def melody
