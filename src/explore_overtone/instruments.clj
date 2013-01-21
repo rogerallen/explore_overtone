@@ -54,10 +54,10 @@
 (ping)
 (tb303 :note 40 )
 (mooger :osc1 2 :osc2 1) ; (stop)
-(rise-fall-pad)
+(rise-fall-pad) ; (stop)
 (pad :s 0.5) ; (ctl pad :gate 0) (stop)
 (overpad) ; (nice)
-(buzz) ; ???
+(buzz) ; ??? envelope went past end of inputs.
 (bass)
 (daf-bass) ; (stop)
 (grunge-bass)

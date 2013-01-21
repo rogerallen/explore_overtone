@@ -8,26 +8,27 @@
             [explore-overtone.sawbble :as eos]))
 
 (defmethod play-note :leader
-  [{midi :pitch}] (-> midi (oss/ektara :gate 1)))
-(defmethod play-note :follower
-  [{midi :pitch}] (-> midi (+ 12) (eos/sawbble-synth
-                                   :lfo-freq 9.0
-                                   :lpf-lfo-freq 3.0
-                                   :amp 1.0
-                                   :adsr-sustain-level 0.9
-                                   :gate 1)))
-(defmethod play-note :bass
-  [{midi :pitch}] (-> midi (- 12) (oss/ektara
-                                   :amp 0.5
-                                   :distort 0.3
-                                   :gate 1)))
+  [{:keys [pitch time duration]}]
+  (let [synth-id (oss/ektara :note pitch :gate 1)]
+    (o/at (+ time duration) (o/ctl synth-id :gate 0))))
 
-(defmethod stop-note :leader
-  [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
-(defmethod stop-note :follower
-  [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
-(defmethod stop-note :bass
-  [{midi :pitch} cur-inst] (o/ctl cur-inst :gate 0))
+(defmethod play-note :follower
+  [{:keys [pitch time duration]}]
+  (let [synth-id (eos/sawbble-synth :note (+ pitch 12)
+                                    :lfo-freq 9.0
+                                    :lpf-lfo-freq 3.0
+                                    :amp 1.0
+                                    :adsr-sustain-level 0.9
+                                    :gate 1)]
+    (o/at (+ time duration) (o/ctl synth-id :gate 0))))
+
+(defmethod play-note :bass
+  [{:keys [pitch time duration]}]
+  (let [synth-id (oss/ektara :note (- pitch 12)
+                             :amp 0.5
+                             :distort 0.3
+                             :gate 1)]
+    (o/at (+ time duration) (o/ctl synth-id :gate 0))))
 
 (def melody
                ; Row, row, row your boat,
@@ -62,9 +63,12 @@
     (where :time speed)
     (where :duration speed)
     (where :pitch key)
-    play2))
+    play))
 
 (comment
+  (row-row (bpm 120) (comp G sharp major))
+  (row-row (bpm 120) (comp C minor))
+  ;; below is only in my own mods
   (row-row (bpm 120) (comp G3 ♯ major))
   (row-row (bpm 90) (comp B4 ♭ minor))
 )
