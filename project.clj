@@ -2,7 +2,7 @@
   :description "Explorations while learning Overtone."
   :dependencies [ [org.clojure/clojure "1.4.0"]
                   [org.clojure/tools.trace "0.7.3"]
-                  [overtone "0.8.0-RC19"]
+                  [overtone "0.8.0-RC20"]
                   [quil "1.6.0"]
                   [oversampler "0.3.0-SNAPSHOT"]
                   [leipzig "0.2.0"]
