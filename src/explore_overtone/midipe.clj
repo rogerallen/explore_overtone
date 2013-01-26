@@ -8,6 +8,8 @@
 ;;   (mp/record) ;; restart recording
 ;;   (mp/save)   ;; save data to file
 ;;   (mp/open "my-saved-events.clj") ;; read events from saved file
+;;   (count (mp/partition-by-timestamp)) ;; how many snippets do you have?
+;;   (nth (mp/partition-by-timestamp) 2) ;; grab 3rd snippet
 ;; ======================================================================
 (ns explore-overtone.midipe
   (:use [overtone.music.time :only [now]]
@@ -18,6 +20,10 @@
 (def midipe-dirty (atom false))
 (def midipe-filename (atom nil))
 (def midipe-events (atom []))
+
+;; well, this could be an atom if I was doing this "for real"
+;; 2 seconds should be pretty decent
+(def midipe-partition-threshold 2000000)
 
 ;; ======================================================================
 (defn- to-file
@@ -129,3 +135,34 @@ Start monitoring events. Returns new filename."
   (dirty?)
   @midipe-dirty
   )
+
+;; ======================================================================
+;; manipulating events
+(defn- events-timestamp-Δ
+  "add a timestamp-Δ (cur-prev timestamp) to each event"
+  []
+  (cons
+   (assoc (first @midipe-events) :timestamp-̣Δ 0)
+   (map #(assoc %2 :timestamp-̣Δ (- (:timestamp %2) (:timestamp %1)))
+        @midipe-events
+        (rest @midipe-events))))
+
+;; variation of partition-by
+(defn- partition-at-true
+  "Applies f to each value in coll, splitting it each time f returns
+   true.  Returns a lazy seq of partitions."
+  [f coll]
+  (lazy-seq
+   (when-let [s (seq coll)]
+     (let [fst (first s)
+           fv (f fst)
+           run (cons fst (take-while #(= false (f %)) (next s)))]
+       (cons run (partition-at-true f (seq (drop (count run) s))))))))
+
+(defn partition-by-timestamp
+  "create a lazy seq of event seqs partitioned when timestamp goes
+  over a threshold."
+  []
+  (partition-at-true
+   #(> (:timestamp-̣Δ %) midipe-partition-threshold)
+   (events-timestamp-Δ)))
