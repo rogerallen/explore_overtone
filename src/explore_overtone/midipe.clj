@@ -159,6 +159,7 @@ Start monitoring events. Returns new filename."
            run (cons fst (take-while #(= false (f %)) (next s)))]
        (cons run (partition-at-true f (seq (drop (count run) s))))))))
 
+;; FIXME?  Do I need to worry about note-on ... note-off pairs that go over threshold?
 (defn partition-by-timestamp
   "create a lazy seq of event seqs partitioned when timestamp goes
   over a threshold."
