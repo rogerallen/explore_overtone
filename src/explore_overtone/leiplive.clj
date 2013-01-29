@@ -61,10 +61,11 @@
   [bpm quanta notes]
   (map #(assoc %
           :time (quantize bpm quanta (/ (:time %) 1000.0))
-          :duration (quantize bpm quanta (/ (:duration %) 1000.0)))
+          ;; don't let duration = 0
+          :duration (max quanta (quantize bpm quanta (/ (:duration %) 1000.0))))
          notes))
 ;; (quantize-notes 60.0 0.5 [{:time 0 :duration 1000} {:time 1005 :duration 1495} {:time 2490 :duration 990}])
-;;                -> ({:time 0.0} {:time 1.0} {:time 2.5})
+;; -> ({:duration 1.0, :time 0.0} {:duration 1.5, :time 1.0} {:duration 1.0, :time 2.5})
 
 (defn click-track
   [speed measures]
@@ -74,10 +75,12 @@
        (where :duration speed)
        (where :part (is :leader))))
 
-(defn get-quant-melody [n bpm]
+(defn get-quant-melody [n the-bpm]
   (->> (nth (mp/partition-by-timestamp) n)
        (for-leipzig)
-       (quantize bpm 0.5)
+       (quantize-notes the-bpm 0.06125)
+       (where :time (bpm the-bpm))
+       (where :duration (bpm the-bpm))
        (where :part (is :leader))))
 
 (comment
@@ -87,7 +90,7 @@
   (get-melody 4)
   (play (click-track (bpm 92) 4))
   (play (->>
-         (get-melody 3)
+         (get-quant-melody 3 92)
          (times 2)))
   (play (->>
          (get-melody 4)
@@ -100,6 +103,8 @@
   (map #(* (/ 105 60.0) ; 105 bpm -> 1.75 bps
            (/ (:time %) 1000.0)) ; time in s
        (get-melody 4))
+
+  (map #(:duration %) (get-quant-melody 3 92))
   
   (mp/save)
   (o/stop)

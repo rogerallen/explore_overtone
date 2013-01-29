@@ -167,3 +167,10 @@ Start monitoring events. Returns new filename."
   (partition-at-true
    #(> (:timestamp-̣Δ %) midipe-partition-threshold)
    (events-timestamp-Δ)))
+
+(defn summary
+  "summarize the current situation"
+  []
+  (println "midipe-dirty:   " @midipe-dirty)
+  (println "midipe-filename:" @midipe-filename)
+  (println "event count:    " (count @midipe-events)))
