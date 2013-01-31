@@ -5,7 +5,7 @@
     leipzig.canon)
   (:require [overtone.live :as o]
             [overtone.synth.stringed :as oss]
-            [explore-overtone.midipe :as mp]))
+            [explore-overtone.midi-persi :as mp]))
 
 (defmethod play-note :leader
   [{:keys [pitch time duration]}]
@@ -41,7 +41,7 @@
                    :pitch    (:note %)))))))
 
 (defn get-melody [n]
-  (->> (nth (mp/partition-by-timestamp) n)
+  (->> (nth (mp/partition-by-timestamp (mp/get-list)) n)
        (for-leipzig)
        (where :part (is :leader))))
 
@@ -75,37 +75,56 @@
        (where :duration speed)
        (where :part (is :leader))))
 
-(defn get-quant-melody [n the-bpm]
-  (->> (nth (mp/partition-by-timestamp) n)
+(defn get-quant-melody [n the-bpm the-quanta]
+  (->> (nth (mp/partition-by-timestamp (mp/get-list)) n)
        (for-leipzig)
-       (quantize-notes the-bpm 0.06125)
-       (where :time (bpm the-bpm))
-       (where :duration (bpm the-bpm))
+       (quantize-notes the-bpm the-quanta)
        (where :part (is :leader))))
 
+;; FIXME -- this is only a start.  Breaks down if there are rests
+(defn print-phrase [xs]
+  (println "(phrase" (apply vector (map :duration xs)))
+  (println "       " (apply vector (map :pitch xs)) ")"))
+
 (comment
-  (mp/new)
+  (mp/init!)  ;; only one time
+  (mp/new!)   ;; each time you want to put work in a new file
+  (mp/save!)  ;; to save work away
+  (mp/record) ;; start recording midi events
+  (mp/pause)  ;; pause recording midi events
+
+  ;; listen to midi
   (def mpp (o/midi-poly-player (partial oss/ektara :gate 1)))
-  (count (mp/partition-by-timestamp))
-  (get-melody 4)
-  (play (click-track (bpm 92) 4))
+
+  ;; how many 'snippets' do you have?
+  (count (mp/partition-by-timestamp (mp/get-list)))
+
+  ;; play the first one
+  (play (->>
+         (get-melody 2)
+         (times 2)))
+  
+  ;; play the first one, quantized at 92 bpm, played back faster 
+  (play (->>
+         (get-quant-melody 10 80 0.5)
+         (times 2)
+         (canon (comp (simple 8) (interval 7)))
+         (where :time (bpm 180))
+         (where :duration (bpm 180))))
+
+  (print-phrase (get-quant-melody 10 80 0.5))
+
+  (def m1 (phrase [3 1 4  3 1 4  3 0.5 0.5  3 0.5 0.5  4.0]
+                  [48 52 55 53 60 55 52 53 52 50 52 50 48] ))
+  (play (->> m1
+         (times 2)
+         (canon (comp (simple 8) (interval 5)))
+         (where :part (is :leader))
+         (where :time (bpm 180))
+         (where :duration (bpm 180))))
+  
+  (play (click-track (bpm 80) 4))
   (play (->>
          (get-quant-melody 3 92)
          (times 2)))
-  (play (->>
-         (get-melody 4)
-         (times 2)))
-  (play (->>
-         (concat (get-melody 4)
-                 (get-melody 2))
-         (sort-by :time)))
-
-  (map #(* (/ 105 60.0) ; 105 bpm -> 1.75 bps
-           (/ (:time %) 1000.0)) ; time in s
-       (get-melody 4))
-
-  (map #(:duration %) (get-quant-melody 3 92))
-  
-  (mp/save)
-  (o/stop)
 )

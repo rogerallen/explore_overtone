@@ -4,8 +4,8 @@
   (:require [persi.core :as persi]))
 
 ;; ======================================================================
-;; 2 seconds should be pretty decent
-(def partition-threshold 2000000)
+;; 10 seconds should be pretty decent
+(def partition-threshold 10000000)
 
 ;; ======================================================================
 ;; echo persi api

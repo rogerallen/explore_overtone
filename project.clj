@@ -8,6 +8,5 @@
                  [oversampler "0.3.0"]
                  [leipzig "0.3.0"]
                  [persi "0.1.0-SNAPSHOT"]]
-  :plugins [ [lein-swank "1.4.5"] ]
   :jvm-opts ["-Dfile.encoding=UTF-8"]
   )
