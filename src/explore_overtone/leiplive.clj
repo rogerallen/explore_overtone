@@ -45,7 +45,7 @@
        (for-leipzig)
        (where :part (is :leader))))
 
-(defn round
+(defn round ;; FIXME clojure.math.numeric-tower?
   "round to nearest integer since int truncates."
   [x]
   (int (+ x 0.5)))
@@ -86,6 +86,30 @@
   (println "(phrase" (apply vector (map :duration xs)))
   (println "       " (apply vector (map :pitch xs)) ")"))
 
+(defn- from [base] (partial + base))
+(defn- unfrom [base] (partial + (- base)))
+;; ((unfrom 60) 63) -> 3
+(defmacro defs {:private true} [names values]
+  `(do ~@(map
+     (fn [name value] `(def ~name ~value))
+     names (eval values))))
+(defs [unC unD unE unF unG unA unB]
+  (map
+    (comp unfrom (from 60) major)
+    (range)))
+;; (unC) -> -60
+(defn sum-n [series n] (apply + (take n series)))
+;; given intervals and sum-of-intervals, return the interval that produces that sum
+;; 
+(defn unscale-of ;;:natural?
+  [intervals degree-sum]
+  (count (take-while #(<= % degree-sum) (reductions + (cycle intervals)))))
+(defn unscale [intervals] (partial unscale-of intervals))
+(def unmajor (unscale [2 2 1 2 2 2 1]))
+;;(unmajor 9) -> 5
+;;(major 5) -> 9
+;;((comp unmajor unC) 69) -> 5
+
 (comment
   (mp/init!)  ;; only one time
   (mp/new!)   ;; each time you want to put work in a new file
@@ -101,7 +125,7 @@
 
   ;; play the first one
   (play (->>
-         (get-melody 2)
+         (get-melody 22)
          (times 2)))
   
   ;; play the first one, quantized at 92 bpm, played back faster 
@@ -109,6 +133,17 @@
          (get-quant-melody 10 80 0.5)
          (times 2)
          (canon (comp (simple 8) (interval 7)))
+         (where :time (bpm 180))
+         (where :duration (bpm 180))))
+
+  ;; transpose this
+  (play (->>
+         (get-quant-melody 22 80 0.25)
+         ;; change from C major to intervals
+         (where :pitch (comp unmajor unC))
+         ;;(times 2)
+         ;;(canon (comp (simple 8) (interval 7)))
+         (where :pitch (comp D phrygian))
          (where :time (bpm 180))
          (where :duration (bpm 180))))
 
@@ -123,8 +158,13 @@
          (where :time (bpm 180))
          (where :duration (bpm 180))))
   
-  (play (click-track (bpm 80) 4))
+  (play (click-track (bpm 80) 8))
   (play (->>
          (get-quant-melody 3 92)
          (times 2)))
+
+  ;; leipzig
+  (C)
+  ((comp C major) 22)
+  (sharp 5)
 )
