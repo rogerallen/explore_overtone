@@ -5,12 +5,19 @@
     leipzig.canon)
   (:require [overtone.live :as o]
             [overtone.synth.stringed :as oss]
+            [overtone.sc.sample :as osamp]
+            [overtone.libs.freesound :as ofree]
             [explore-overtone.midi-persi :as mp]))
 
 (defmethod play-note :leader
   [{:keys [pitch time duration]}]
   (let [synth-id (oss/ektara :note pitch :gate 1)]
     (o/at (+ time duration) (o/ctl synth-id :gate 0))))
+
+(def snap (osamp/sample (ofree/freesound-path 87731)))
+(defmethod play-note :click
+  [{:keys [time]}]
+  (snap))
 
 (defn add-durations
   "add durations to each note-on"
@@ -73,7 +80,7 @@
        (times measures)
        (where :time speed)
        (where :duration speed)
-       (where :part (is :leader))))
+       (where :part (is :click))))
 
 (defn get-quant-melody [n the-bpm the-quanta]
   (->> (nth (mp/partition-by-timestamp (mp/get-list)) n)
@@ -141,9 +148,9 @@
          (get-quant-melody 22 80 0.25)
          ;; change from C major to intervals
          (where :pitch (comp unmajor unC))
-         ;;(times 2)
-         ;;(canon (comp (simple 8) (interval 7)))
          (where :pitch (comp D phrygian))
+         ;;(times 2)
+         (canon (comp (simple 8) (interval -5)))
          (where :time (bpm 180))
          (where :duration (bpm 180))))
 
