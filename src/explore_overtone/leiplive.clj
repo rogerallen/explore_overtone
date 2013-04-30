@@ -153,7 +153,7 @@
 ;; ======================================================================
 
 (comment
-  (mp/init!)  ;; only one time
+  (mp/init!)  ;; once a session
   (mp/new!)   ;; each time you want to put work in a new file
   (mp/save!)  ;; to save work away
   (mp/record) ;; start recording midi events
