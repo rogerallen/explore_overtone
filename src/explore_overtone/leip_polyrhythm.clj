@@ -1,4 +1,4 @@
-(ns explore-overtone.leiplive
+(ns explore-overtone.leip-polyrhythm
   (:require [overtone.live   :as o]
             [leipzig.live    :as ll]
             [leipzig.melody  :as lm]))
@@ -30,10 +30,9 @@
   [p0 p1 bpm]
   (let [r0   (repeat (count p0) 1)
         r1   (repeat (count p1) 1)
-        bpm0 (* 2 bpm) ; assume eighth note pattern FIXME
         ;; scale tempo up so that both rhythms match up
-        bpm1 (* bpm0 (/ (count r1) (count r0)))
-        phr0 (my-phrase r0 p0 bpm0)
+        bpm1 (* bpm (/ (count r1) (count r0)))
+        phr0 (my-phrase r0 p0 bpm)
         phr1 (my-phrase r1 p1 bpm1)]
     (->> phr0 (lm/with phr1))))
 
@@ -41,15 +40,16 @@
 (def poly-beats
   (poly-rhythm [:chh :--- :chh :--- :chh :---]
                [:clp :--- :clp :--- :clp :--- :clp :---]
-               80))
+               (* 2 80)))
 
+;; start the jam
 (ll/jam poly-beats)
 
-;; add some interest and play with this...
+;; play with this to add some more interesting beats
 (def poly-beats
   (poly-rhythm [:chh :kck :chh :ohh :chh :kck]
                [:clp :chh :clp :chh :clp :--- :clp :---]
-               80))
+               (* 2 80)))
 
 ;; to turn off the melody
 (def poly-beats nil)
