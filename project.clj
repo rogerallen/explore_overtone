@@ -1,8 +1,7 @@
 (defproject explore_overtone "0.0.0"
   :description "Explorations while learning Overtone."
-  :dependencies [[org.clojure/clojure "1.4.0"]
-                 [org.clojure/tools.trace "0.7.3"]
-                 ;;[overtone "0.8.1"]
+  :dependencies [[org.clojure/clojure "1.5.1"]
+                 [org.clojure/tools.trace "0.7.5"]
                  [overtone "0.9.0-SNAPSHOT"]
                  [quil "1.6.0"]
                  [oversampler "0.3.0"]
