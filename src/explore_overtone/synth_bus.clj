@@ -52,7 +52,7 @@
 (def x (bar :position :tail :ibus b0 :obus b1))
 
 ;; add [y] after [x]                        >--b0-->[x]>--b1-->[y]
-(def q (qux :position :tail :ibus b1))
+(def y (qux :position :tail :ibus b1))
 
 ;; place [w] at the start of b0          [w]>--b0-->[x]>--b1-->[y]
 (def w (foo :position :head :obus b0))
