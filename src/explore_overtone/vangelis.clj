@@ -41,14 +41,15 @@
    drylevel      -3     ;; amount of dry signal (dB)
    earlyreflevel -9     ;; amount of early reflection level (dB)
    taillevel     -11    ;; amount of tail level (dB)
-   lpf-freq      1000.0 ;;
+   moog-freq     1000.0 ;;
+   moog-res      0.5    ;;
    reverb-level  1.0]
   (let [source (in in-bus 2)
         effect (g-verb source
                        roomsize revtime damping inputbw spread
                        drylevel earlyreflevel taillevel)
         effect (* reverb-level effect)
-        effect (lpf effect lpf-freq)]
+        effect (moog-ff effect moog-freq moog-res)]
     (out out-bus (+ effect source))))
 
 ;; from doc.sccode.org/Classes/GVerb.html
@@ -70,7 +71,7 @@
 
 ;; ======================================================================
 ;; creating this dataflow
-;; [v]>--b0-->[x]>--b1-->[y]
+;; [v]>--b0-->[y]>--b1-->[x]
 (def b0 (audio-bus 2))
 (def b1 (audio-bus 2))
 
