@@ -80,30 +80,31 @@
                :amp-konst           1.0
                :separation-delay-ms 8.0
                :separation-phase    -1
-               :lpf-lfo-freq        (the-bps 2)
-               :lpf-min-freq-ratio  10.0
-               :lpf-max-freq-ratio  20.0
+               :lpf-lfo-freq        (the-bps 1)
+               :lpf-min-freq-ratio  20.0
+               :lpf-max-freq-ratio  40.0
                :lpf-res             0.4
-               :lfo-level-ratio     0.005
-               :lfo-freq            (the-bps 2)
+               :lfo-level-ratio     0.5
+               :lfo-freq            (the-bps 1)
                :adsr-attack-time    (the-spb 0.5)
                :adsr-decay-time     (the-spb 0.25)
-               :adsr-sustain-level  0.8
+               :adsr-sustain-level  0.2
                :adsr-release-time   (the-spb 3)
-               :adsr-peak-level     1.0
+               :adsr-peak-level     0.4
                :adsr-curve          4
                :out-bus             b0))
 
-(def x (van-reverb :position :tail :in-bus b0 :out-bus b1))
-(def y (van-echo   :position :tail :in-bus b1))
+(def y (van-echo   :position :tail :in-bus b0 :out-bus b1))
+(def x (van-reverb :position :tail :in-bus b1)) ;; put the lowpass filter at the end.  :^)
 (ctl x
-     :spread       10.0
-     :reverb-level 0.5
-     :lpf-freq     500.0)
+     :spread       10.5
+     :reverb-level 0.3
+     :moog-freq    1000.0
+     :moog-res     0.4)
 (ctl y
-     :delay-time (the-spb 2)
-     :decay-time (the-spb 4)
-     :echo-level 0.2)
+     :delay-time (the-spb 0.5)
+     :decay-time (the-spb 2)
+     :echo-level 0.3)
 
 (def v (midi-poly-player vangelis))
 (midi-player-stop)
