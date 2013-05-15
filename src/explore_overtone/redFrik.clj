@@ -1,4 +1,4 @@
-(ns explore-overtone.red-frick
+(ns explore-overtone.red-frik
   (:use [overtone.live]))
 
 ;; Translations of @redFrik's sctweets to Overtone
@@ -59,7 +59,7 @@
 ;;   Exception Invalid ugen tree passed to topological-sort-ugens, maybe you have cycles in the synthdef...
 ;;   overtone.sc.synth/topological-sort-ugens (synth.clj:415)
 ;;
-(defsynth red-frik-130511
+(defsynth red-frik-333317729073381377
   []
   (out 0
        (/ (mix ;; docs suggest this is the same as 'mean'
@@ -75,7 +75,7 @@
                        0.1)))
           40))) ;; reduce volume to avoid clipping
 
-(red-frik-130511)
+(red-frik-333317729073381377)
 (stop)
 
 ;; May 1, 2013
@@ -130,7 +130,7 @@
 ;; } ! 2
 ;;
 
-(defsynth red-frik-130501
+(defsynth red-frik-329680702205468674
   []
   (for [k (range 2)]
     (out k
@@ -145,5 +145,50 @@
                               j))))))
             3))))
 
-(red-frik-130501)
+(red-frik-329680702205468674)
+(stop)
+
+;; https://twitter.com/redFrik/status/329311535723839489
+;; play{a=LFTri;RLPF.ar(LeakDC.ar(a.ar(LeakDC.ar((1..9).sum{|x|Pan2.ar(a.ar(1/x,x/3)>0.3333,a.ar(666/x))})*999)).distort,3e3)}
+;;
+;; play {
+;;   RLPF.ar(
+;;     LeakDC.ar(
+;;       LFTri.ar(
+;;         LeakDC.ar(
+;;           (1..9).sum{
+;;             |x|
+;;             Pan2.ar(
+;;               LFTri.ar(
+;;                 1/x,
+;;                 x/3) > 0.3333,
+;;               LFTri.ar(666/x)
+;;             )
+;;           }
+;;         ) * 999
+;;       )
+;;     ).distort,
+;;     3e3
+;;   )
+;; }
+(defsynth red-frik-329311535723839489
+  []
+  (out 0
+       (rlpf:ar
+        (distort
+         (leak-dc:ar
+          (lf-tri:ar
+           (* (leak-dc:ar
+               (sum
+                (for [x (range 1 9)]
+                  (pan2:ar
+                   (> (lf-tri:ar (/ 1 x) (/ x 3)) 0.3333)
+                   (lf-tri:ar (/ 666 x))))))
+              999))))
+        3e3)))
+
+;; 218 chars.  :^)
+;; (defsynth red-frik-329311535723839489 [] (out 0 (rlpf:ar (distort (leak-dc:ar (lf-tri:ar (* (leak-dc:ar (sum (for [x (range 1 9)] (pan2:ar (> (lf-tri:ar (/ 1 x) (/ x 3)) 0.3333) (lf-tri:ar (/ 666 x)))))) 999)))) 3e3)))
+
+(red-frik-329311535723839489)
 (stop)
