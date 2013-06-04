@@ -17,9 +17,13 @@
 ;; guitar plays melody, piano plays accompaniment
 
 (strings/gen-stringed-synth ektara 1 true)
-(defn pick [distort amp {midi :pitch, start :time, length :duration}]
+(defn pick [distort amp pan {midi :pitch, start :time, length :duration}]
     (let [synth-id (o/at start
-                     (ektara midi :distort distort :amp amp :gate 1))]
+                     (ektara midi :distort distort :amp amp :gate 1 :pan pan
+                             ;;:rvb-mix 0.35 :rvb-room 0.85 :rvb-damp 0.85
+                             ;;:rvb-mix 0.0 :rvb-room 0.0 :rvb-damp 0.0
+                             ;;:lp-freq 4000 :lp-rq 0.5
+                             ))]
       (o/at (+ start length) (o/ctl synth-id :gate 0))))
 
 (strings/gen-stringed-synth string3 3 true)
@@ -46,7 +50,7 @@
 
 (defmethod ll/play-note :melody [note]
   ;;(piano1 1.0 note))
-  (pick 0.3 1.0 note))
+  (pick 0.2 0.8 -0.55 note))
 
 (defmethod ll/play-note :accompaniment [notes]
   (piano3 1.0 notes))
@@ -240,8 +244,10 @@
 (play-song song-bpm song-key the-song)
 
 (comment
+  (o/recording-start "random_access_melodies.wav")
   ;; or enjoy some random tunes
-  (play-song (lm/bpm (+ 60 (rand-int 100)))
-             (comp ls/low ls/F ls/sharp ls/phrygian)
+  (play-song (lm/bpm (+ 100 (rand-int 100)))
+             (comp ls/low ls/G ls/mixolydian)
              (make-song))
+  (o/recording-stop)
   )
