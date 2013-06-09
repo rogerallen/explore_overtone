@@ -6,7 +6,9 @@ things.
 
 ## Usage
 
-Use at your own risk.
+Use at your own risk.  Most files are meant to be used standalone via
+the REPL.  Overtone is a dynamic project and sometimes older code may
+not work any more.  Let me know if you have any questions.
 
 ## License
 
@@ -29,7 +31,8 @@ There are more half-baked ideas in the repo, but these are some of the highlight
 
   https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/guitar.clj
 
-  A derivative of this code has found its way into Overtone!  See https://github.com/overtone/overtone/blob/master/src/overtone/synth/stringed.clj
+  A derivative of this code has found its way into Overtone!  See
+  https://github.com/overtone/overtone/blob/master/src/overtone/synth/stringed.clj
 
 * Ambient Piano via Pi
 
@@ -59,8 +62,7 @@ There are more half-baked ideas in the repo, but these are some of the highlight
 
 # Questions & Answers
 
-Q & A about the environment below.  For questions that can be answered
-with code, see
+For questions about Overtone, etc. that need code and confused me at the beginning, see:
 https://github.com/rogerallen/explore_overtone/blob/master/src/explore_overtone/qna.clj
 
 I'll write down questions as I think of them.  Answers as I get to them.

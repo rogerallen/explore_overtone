@@ -19,7 +19,7 @@
                  [overtone "0.9.0-SNAPSHOT"]
                  [quil "1.6.0"]
                  [oversampler "0.3.0"]
-                 [leipzig "0.4.0"]
+                 [leipzig "0.5.0-SNAPSHOT"]
                  [org.lwjgl.lwjgl/lwjgl "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl_util "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl-platform "2.8.5"
