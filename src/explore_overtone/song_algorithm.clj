@@ -40,13 +40,10 @@
       (o/at (+ start length) (o/ctl synth-id :gate 0))))
 
 (defn piano3 [{pitches :pitch, start :time, length :duration, amp :dynamic}]
-    (let [[n0 n1 n2] pitches
-          synth-id0  (o/at start (piano/sampled-piano :note n0 :level amp))
-          synth-id1  (o/at start (piano/sampled-piano :note n1 :level amp))
-          synth-id2  (o/at start (piano/sampled-piano :note n2 :level amp))]
-      (o/at (+ start length) (o/ctl synth-id0 :gate 0))
-      (o/at (+ start length) (o/ctl synth-id1 :gate 0))
-      (o/at (+ start length) (o/ctl synth-id2 :gate 0))))
+  (doall
+   (doseq [n0 pitches]
+     (let [synth-id0  (o/at start (piano/sampled-piano :note n0 :level amp))]
+       (o/at (+ start length) (o/ctl synth-id0 :gate 0))))))
 
 (defmethod ll/play-note :melody [note]
   ;;(piano1 note))
@@ -115,40 +112,40 @@
   []
   ;; normally increment by +/-1, but try other variants with some frequency
   (let [pitch-step-base -8;-7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7  8
-        pitch-step-dist [2  1  3  1  3  1  3 15  3 15  3  1  3  1  3  1  2]
+        pitch-step-dist [0  0  0  0  2  1  4 15  2 15  4  1  2  0  0  0  0]
         pitch-step (+ pitch-step-base (wrand pitch-step-dist))]
     pitch-step))
 
 (defn make-call-phrase
   "create a random phrase suitable for the call part of a call/response"
-  [num-beats duration-dist]
-  (let [start-pitch (wrand [1 1 1 1 1 1 1 1])
+  [num-beats duration-dist dyn-dist]
+  (let [start-pitch (wrand [4 1 1 2 2 1 1 1])
         durations   (make-durations duration-dist (* 2 num-beats))
         durations   (map #(/ % 2) durations)
         pitches     (take (count durations)
                          (iterate (fn [x] (+ x (rand-melody-pitch-step))) start-pitch))
         dynamics    (take (count durations)
-                          (repeatedly #(/ (+ (wrand [1 2 2 2 2]) 5) 10)))]
+                          (repeatedly #(/ (+ (wrand dyn-dist) 3) 10)))]
     (dynamic-phrase durations pitches dynamics)))
 
 ;; FIXME make proper response. add "peak" in here somewhere
 (defn make-response-phrase
-  [num-beats duration-dist]
-  (make-call-phrase num-beats duration-dist))
+  [num-beats duration-dist dyn-dist]
+  (make-call-phrase num-beats duration-dist dyn-dist))
 
 ;; types of transposition to consider:
 ;; * pitch transposition (up a third, etc.)
 ;; * retrograde (reverse the melody)
-;; o time augmentation (double, halve, etc.)
 ;; * inversion (upside down melody)
-;; * combinations of all the above
+;; o time augmentation (double, halve, etc.)
+;; o combinations of all the above
 
 (defn alter-phrase
   [the-phrase]
   (let [r (wrand [3 1 2])]
     (case r
       0 ((lc/interval (rand-melody-pitch-step)) the-phrase)
-      1 ((lc/simple 8) (lc/crab the-phrase)) ;; FIXME lc/simple may go away per liepzig issue #8
+      1 (sort-by :time (lc/crab the-phrase))
       2 ((lc/interval (rand-melody-pitch-step)) (lc/mirror the-phrase))
       )))
 ;; (def foo (make-call-phrase 8 [0 1 1]))
@@ -173,12 +170,12 @@
 ;;
 ;; FIXME this is just one type structure.  there are probably an infinite variety
 (defn make-melody
-  [duration-dist num-beats melody-keyword]
+  [duration-dist dyn-dist num-beats melody-keyword]
   (let [num-phrase-beats (/ num-beats 8)
-        melody-a  (make-call-phrase     num-phrase-beats duration-dist)
-        melody-b  (make-response-phrase num-phrase-beats duration-dist)
-        melody-c  (make-call-phrase     num-phrase-beats duration-dist)
-        melody-d  (make-response-phrase num-phrase-beats duration-dist)
+        melody-a  (make-call-phrase     num-phrase-beats duration-dist dyn-dist)
+        melody-b  (make-response-phrase num-phrase-beats duration-dist dyn-dist)
+        melody-c  (make-call-phrase     num-phrase-beats duration-dist dyn-dist)
+        melody-d  (make-response-phrase num-phrase-beats duration-dist dyn-dist)
         melody-b1 (alter-phrase melody-b)
         melody-b2 (alter-phrase melody-b)
         melody-c1 (alter-phrase melody-c)]
@@ -218,11 +215,11 @@
 ;; http://www.hooktheory.com/trends
 ;; ]
 ;;
-;; FIXME you may notice quite a bit of similarity with make-melody.  This should change
+;; FIXME should be different than make-melody
 ;;
 (defn make-accompaniment
-  [duration-dist num-beats accompaniment-keyword]
-  (make-melody duration-dist num-beats accompaniment-keyword))
+  [duration-dist dyn-dist num-beats accompaniment-keyword]
+  (make-melody duration-dist dyn-dist num-beats accompaniment-keyword))
 
 (def inc2 (comp inc inc))
 (defn triad
@@ -230,18 +227,32 @@
   [key start-index]
   (take 3 (map key (iterate inc2 start-index))))
 
+(defn seventh
+  "translates to a chord with tonic at start-index"
+  [key start-index]
+  (take 4 (map key (iterate inc2 start-index))))
+
+(defn ninth
+  "translates to a chord with tonic at start-index"
+  [key start-index]
+  (take 5 (map key (iterate inc2 start-index))))
+
 ;; a song has a melody along with chords as accompaniment
 ;; at this point, the chords are just the tonic of the chord
 (defn make-song []
   (let [num-beats 64]
     (->> (make-melody
-          ;;0 0.5 1 1.5 2 2.5 3 durations
-          [ 0  8  2  4  2  4  1]
+          ;;0 0.5 1 1.5 2 2.5 3 3.5 4 durations
+          [ 0  8  8  3  4  2  2  1  1]
+          ;;.3 .4 .5 .6 .7 .8 .9 dynamics
+          [  1  4  6  8  6  2  1]
           num-beats
           :melody)
          (lm/with (make-accompaniment
                    ;; 0 .5 1 1.5 2 2.5 3 3.5 4  longer durations than melody
-                   [  0  0 1  3  4  3  1  1  1]
+                   [  0  0 1  2  4  1  3  1  3]
+                   ;;.3 .4 .5 .6 .7 .8 .9 dynamics
+                   [  1  2  4  6  8  6  2]
                    num-beats
                    :accompaniment)))))
 
@@ -250,7 +261,7 @@
        (lm/where :time speed)
        (lm/where :duration speed)
        (lm/wherever (fn [x] (= :melody (:part x))) :pitch key)
-       (lm/wherever (fn [x] (= :accompaniment (:part x))) :pitch (partial triad key))
+       (lm/wherever (fn [x] (= :accompaniment (:part x))) :pitch (partial ninth key))
        ll/play))
 
 ;; Figure out what key your melody is in, give it a tempo, a key
@@ -264,7 +275,9 @@
   (o/recording-start "random_access_melodies.wav")
   ;; or enjoy some random tunes
   (play-song (lm/bpm (+ 80 (rand-int 100)))
-             (comp ls/D ls/major)
+             (comp ls/low
+                   (rand-nth [ls/C ls/D ls/E ls/F ls/G ls/A])
+                   (rand-nth [ls/major ls/minor ls/mixolydian ls/phrygian ls/blues]))
              (make-song))
   (o/recording-stop)
   )
