@@ -145,7 +145,7 @@
   (let [r (wrand [3 1 2])]
     (case r
       0 ((lc/interval (rand-melody-pitch-step)) the-phrase)
-      1 (sort-by :time (lc/crab the-phrase))
+      1 (lc/crab the-phrase)
       2 ((lc/interval (rand-melody-pitch-step)) (lc/mirror the-phrase))
       )))
 ;; (def foo (make-call-phrase 8 [0 1 1]))
@@ -169,6 +169,9 @@
 ;; b and d are "responses" and need peaks
 ;;
 ;; FIXME this is just one type structure.  there are probably an infinite variety
+;;
+;; Another breakdown: http://www.mixedinkey.com/Book/Visualize-the-Structure-of-Dance-Music
+;;
 (defn make-melody
   [duration-dist dyn-dist num-beats melody-keyword]
   (let [num-phrase-beats (/ num-beats 8)
@@ -221,6 +224,65 @@
   [duration-dist dyn-dist num-beats accompaniment-keyword]
   (make-melody duration-dist dyn-dist num-beats accompaniment-keyword))
 
+;; ======================================================================
+;; http://tweakheadz.com/how-to-make-original-drum-tracks/
+;;
+;; Melody:
+;; 1 make 1-bar pattern
+;;   A
+;; 2 copy/paste to make 2-bar pattern.  add subtle changes to 2nd bar
+;;   AB
+;; 3 CP to make 4-bar pattern.  add subtle changes to 4th bar
+;;   ABAC
+;; 4 CP 8-bar.  add subtle changes to 8th bar
+;;   ABACABAD
+;; 5 CP 16-bar.  add to 16th bar.  Make significant change to bar 16, because this is a major pillar if the song, you should design this fill to lead into the next part of the music.
+;;   ABACABADABACABAE
+;; Summary: A as base.  B,C,D are subtle changes.  E is dramatic change
+;;
+;; Chorus
+;; * same basic pattern but make the hits louder.
+;; * ex. hi hats to crash cymbals.
+;; * as you approach bar 8 of the chorus, you want to drum up
+;;   some excitement as the song should be peaking here.
+;;
+(comment
+  (def snare (sample (freesound-path 26903)))
+  (def kick (sample (freesound-path 2086)))
+  (def close-hihat (sample (freesound-path 802)))
+  (def open-hihat (sample (freesound-path 26657)))
+  (def clap (sample (freesound-path 48310)))
+  (def gshake (sample (freesound-path 113625)))
+
+  (defmethod ll/play-note :drums0 [{p :pitch}]
+    (case p
+      0 nil
+      1 (snare)
+      2 (kick)
+      3 (close-hihat)
+      4 (open-hihat)
+      5 (clap)
+      6 (gshake)))
+
+  (def beats0     ;; 1   2   3   4   5   6   7   8
+    (->> (lm/phrase [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+                    [2 0 1 0 2 0 1 0 2 0 1 0 2 0 1 0]) ;; <- adjust
+         (lm/with (lm/phrase
+                   [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+                   [0 0 5 0 0 0 5 0 0 0 5 0 0 0 5 0]))
+         (lm/with (lm/phrase
+                   [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+                   [3 0 3 0 3 0 3 0 3 0 3 0 3 0 3 0]))
+         (lm/with (lm/phrase
+                   [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+                   [6 6 0 6 6 6 0 6 6 6 0 6 6 6 0 6]))
+         (lm/where :time (lm/bpm (* 2 124)))
+         (lm/where :duration (lm/bpm (* 2 124)))))
+
+  (ll/jam beats0)
+)
+
+;; ======================================================================
 (def inc2 (comp inc inc))
 (defn triad
   "translates to a chord with tonic at start-index"
@@ -261,23 +323,19 @@
        (lm/where :time speed)
        (lm/where :duration speed)
        (lm/wherever (fn [x] (= :melody (:part x))) :pitch key)
-       (lm/wherever (fn [x] (= :accompaniment (:part x))) :pitch (partial ninth key))
+       (lm/wherever (fn [x] (= :accompaniment (:part x))) :pitch (partial ninth key))  ;; FIXME triad/7th/9th select
        ll/play))
 
 ;; Figure out what key your melody is in, give it a tempo, a key
-(def the-song (make-song))
-(def song-bpm (lm/bpm 180))
-(def song-key (comp ls/low ls/D ls/major))
-;; then play it
-(play-song song-bpm song-key the-song)
 
-(comment
-  (o/recording-start "random_access_melodies.wav")
-  ;; or enjoy some random tunes
-  (play-song (lm/bpm (+ 80 (rand-int 100)))
-             (comp ls/low
+;; (o/recording-start "random_access_melodies.wav")
+(do
+  (def the-song (make-song))
+  (def song-bpm (lm/bpm (+ 80 (rand-int 100))))
+  (def song-key (comp ls/low
                    (rand-nth [ls/C ls/D ls/E ls/F ls/G ls/A])
-                   (rand-nth [ls/major ls/minor ls/mixolydian ls/phrygian ls/blues]))
-             (make-song))
-  (o/recording-stop)
-  )
+                   (rand-nth [ls/major ls/minor ls/mixolydian ls/phrygian ls/blues])))
+  ;; then play it
+  (play-song song-bpm song-key the-song)
+)
+;; (o/recording-stop)
