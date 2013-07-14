@@ -192,3 +192,40 @@
 
 (red-frik-329311535723839489)
 (stop)
+
+;; https://twitter.com/redFrik/status/356151997256306691
+;; play{a=LFTri;l=LocalBuf(b=600,9).clear;BufWr.ar(a.ar(c=(3..11)*3.5),l,a.ar(9/c,c/99)*b);Splay.ar(PlayBuf.ar(9,l,loop:1)/2)}
+;;
+;; play{
+;;   a=LFTri;
+;;   l=LocalBuf(b=600,9).clear;
+;;   BufWr.ar(
+;;     a.ar(
+;;       c=(3..11)*3.5
+;;     ),
+;;     l,
+;;     a.ar(9/c,c/99)*b
+;;   );
+;;   Splay.ar(
+;;     PlayBuf.ar(9,l,loop:1)/2
+;;   )
+;; }
+(defsynth red-frik-356151997256306691
+  []
+  (out 0
+       (let [b 600
+             l (local-buf b 9)
+             _ (clear-buf l)
+             _ (buf-wr:ar
+                (lf-tri:ar
+                 (for [c (* (range 3 11) 3.5)] c))
+                l
+                (* (lf-tri:ar
+                    (for [c (* (range 3 11) 3.5)] (/ 9 c))
+                    (for [c (* (range 3 11) 3.5)] (/ c 99)))
+                   b))]
+         (* 3 (splay:ar (play-buf 9 l :loop 1))))))
+;; I needed to amplify it a bit...
+
+(red-frik-356151997256306691)
+(stop)
