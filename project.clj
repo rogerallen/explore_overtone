@@ -16,10 +16,10 @@
   :description "Explorations while learning Overtone."
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/tools.trace "0.7.5"]
-                 [overtone "0.9.0-SNAPSHOT"]
+                 [overtone "0.8.1"]
                  [quil "1.6.0"]
                  [oversampler "0.3.0"]
-                 [leipzig "0.5.0"]
+                 [leipzig "0.6.0"]
                  [org.lwjgl.lwjgl/lwjgl "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl_util "2.8.5"]
                  [org.lwjgl.lwjgl/lwjgl-platform "2.8.5"
