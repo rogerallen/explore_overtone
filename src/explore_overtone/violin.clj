@@ -42,7 +42,7 @@
         ;; 1) the main osc for the violin
         saw    (saw freqv)
         ;; 2) add an envelope for "bowing"
-        saw0   (* saw (env-gen (adsr 1.5 1.5 0.8 1.5) :gate gate))
+        saw0   (* saw (env-gen (adsr 1.5 1.5 0.8 1.5) :gate gate :action FREE))
         ;; a low-pass filter prior to our filter bank
         saw1   (lpf saw0 4000) ;; freq???
         ;; 4) the "formant" filters
@@ -53,7 +53,7 @@
         ;; a high-pass filter on the way out
         saw3   (hpf saw2 30) ;; freq???
         ]
-    (out out-bus (* amp saw3))))
+    (out out-bus (pan2 (* amp saw3)))))
 
 ;; just playing around...
 (comment
