@@ -64,3 +64,44 @@
   (ctl v0 :pitch 60)
   (ctl v0 :gate 0)
 )
+
+;; let's make a violin we control via keyboard & mouse
+;;   keyboard instantiates the note & starts/stops it
+;;   vibrato comes from mouse-x
+;;   amplitude comes from mouse-y
+(defsynth mouse-violin
+  "violin inspired by Sound On Sound April-July 2003 articles."
+  [note    {:default 60  :min 0   :max 127 :step 1}
+   amp     {:default 1.0 :min 0.0 :max 1.0 :step 0.01}
+   gate    {:default 1   :min 0   :max 1   :step 1}
+   out-bus {:default 0   :min 0   :max 127 :step 1}]
+  (let [freq   (midicps note)
+        ;; 3b) portamento to change frequency slowly
+        freqp  (slew:kr freq 100.0 100.0)
+        ;; 3a) mouse-controlled vibrato to make it seem "real"
+        freqv  (+ freqp (* (mouse-x) 0.05 freqp (sin-osc (+ 5 (* 3 (mouse-x))))))
+        ;; 1) the main osc for the violin
+        saw    (saw freqv)
+        ;; 2) add an envelope for "bowing"
+        ;;    adsr is just instant on/off.  mouse-y controls amp, really
+        saw0   (* saw (- 1.0 (mouse-y)) (env-gen (adsr 0.01 0.01 1.0 0.01) :gate gate :action FREE))
+        ;; a low-pass filter prior to our filter bank
+        saw1   (lpf saw0 3000) ;; freq???
+        ;; 4) the "formant" filters
+        band1  (bpf saw1 300 (/ 3.5))
+        band2  (bpf saw1 700 (/ 3.5))
+        band3  (bpf saw1 3000 (/ 2))
+        saw2   (+ band1 band2 band3)
+        ;; a high-pass filter on the way out
+        saw3   (hpf saw2 300) ;; freq???
+        ]
+    (out out-bus (pan2 (* amp saw3)))))
+
+;;(def v (violin))
+;;(ctl v :gate 0)
+;; NOTE: with this, portamento goes out the window since we are creating
+;; a new note with each 'note-on'
+(def player (midi-poly-player mouse-violin))
+
+;; when you want to stop
+(midi-player-stop)
