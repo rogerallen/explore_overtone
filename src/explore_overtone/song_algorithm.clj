@@ -2,11 +2,11 @@
   (:require [overtone.live           :as o]
             [overtone.synth.stringed :as strings]
             [oversampler.piano.inst  :as piano]
-            [leipzig.live   :as ll]
-            [leipzig.melody :as lm]
-            [leipzig.scale  :as ls]
-            [leipzig.canon  :as lc]
-            [leipzig.chord  :as lch]))
+            [leipzig.live            :as ll]
+            [leipzig.melody          :as lm]
+            [leipzig.scale           :as ls]
+            [leipzig.canon           :as lc]
+            [leipzig.chord           :as lch]))
 
 ;; This code inspired by this question/comment on Reddit:
 ;;   http://www.reddit.com/r/musictheory/comments/1fe8y9/adding_chords_to_melody/
@@ -16,7 +16,7 @@
 ;; First setup some instruments to play with
 ;; guitar plays melody, piano plays accompaniment
 
-(strings/gen-stringed-synth ektara 1 true)
+;;(strings/gen-stringed-synth ektara 1 true)
 (defn pick [distort pan {midi :pitch, start :time, length :duration, amp :dynamic}]
     (let [synth-id (o/at start
                      (ektara midi :distort distort :amp amp :gate 1 :pan pan
