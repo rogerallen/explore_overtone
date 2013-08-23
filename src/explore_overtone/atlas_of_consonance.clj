@@ -16,18 +16,19 @@
   [fs]
   (map #(* % 2) fs))
 
-(defn between-seq
+(defn tone-seq
   [a b i]
   "given the ends of an octave range [a,b] and an increment i, find
-   the notes that lie between [a,b]"
-  (range (+ a i) b i))
+   the tones that lie between and include a and b."
+  (range a (+ b i) i))
 
 (defn per-octave-seqs
-  "for each octave range (f 2f) (2f 4f) (3f 6f) ... find the base frequency multiples in that range.  (e.g. 3f is in the 2nd octave range)"
-  [f]
+  "for each octave range (f 2f) (2f 4f) (3f 6f) ... find the base
+  frequency multiples in that range.  (e.g. 3f is in the 2nd octave
+  range)" [f]
   (let [overtones (overtone-seq f)
         octaves   (octave-seq overtones)]
-    (map (fn [f1 o1] (between-seq f1 o1 f))
+    (map (fn [f1 o1] (tone-seq f1 o1 f))
          overtones
          octaves)))
 
@@ -106,8 +107,8 @@
 ;; ======================================================================
 ;; Quil routines
 (defn setup []
-  (set-tonic-freq  200)
-  (set-note-freq   200)
+  (set-tonic-freq  262)
+  (set-note-freq   262)
   (set-num-octaves 13)
   (q/smooth)
   (q/frame-rate 30))
@@ -117,7 +118,7 @@
   (q/stroke-weight 1.5)
   (q/stroke 0 0 0)
   (q/fill 0 0 0)
-  (let [note-str ["c" "c♯" "d" "d♯" "e" "f" "f♯" "g" "g♯" "a" "a♯" "b" "c"]]
+  (let [note-str ["C" "C♯" "D" "D♯" "E" "F" "F♯" "G" "G♯" "A" "A♯" "B" "C"]]
     (dotimes [i 13]
       (let [x (- (Math/pow 2 (/ i 12)) 1.0)
             x (q/lerp b (- (q/width) b) x)
@@ -129,23 +130,16 @@
 (defn draw-consonance-hatches
   [b h2 max-freq]
   (dorun
-   (doseq [k (keys @freq-histo-atom)]
+   (doseq [k  (keys @freq-histo-atom)]
      (let [w  (@freq-histo-atom k)
-           nw (/ w max-freq)
+           nw (Math/pow (/ w max-freq) 0.75) ;; a bit non-linear
            x  (q/lerp b (- (q/width) b)
                       (/ (- k @tonic-freq-atom) @tonic-freq-atom))
            a  (q/lerp 0 255 nw)
-           sw (+ 1 (* 2 nw))
-           sh (+ 10 (* 30 nw))
-           ;;x  (- x (/ sw 2))
-           ]
+           sh (+ (/ b 10) (* 9 (/ b 10) nw))]
        (q/stroke 200 0 0 a)
        (q/stroke-weight 1.5)
-       (q/line x (- h2 sh) x h2))))
-  (q/stroke 200 0 0 255)
-  (q/stroke-weight 3)
-  (q/line b (- h2 50) b h2)
-  (q/line (- (q/width) b) (- h2 50) (- (q/width) b) h2))
+       (q/line x (- h2 sh) x h2)))))
 
 (defn draw-x-axis
   [b h2]
@@ -172,32 +166,29 @@
     (draw-x-axis b h2)
     (draw-note b)))
 
-(defn get-closest-freq*
-  [x fs]
-  (let [b 50
-        f (q/lerp @tonic-freq-atom (* 2 @tonic-freq-atom)
-                  (/ (- x b) (- (q/width) (* 2 b))))
-        v (apply min-key
-                 (fn [x] (Math/abs (- x f)))
-                 fs)]
-    v))
+(defn get-closest-seq-freq
+  "given sequence of frequencies fs and a goal freq f, return the
+  closest freq"
+  [f fs]
+  (apply min-key (fn [x] (Math/abs (- x f))) fs))
 
 (defn get-closest-diatonic-freq
-  [x]
-  (get-closest-freq* x (map #(* @tonic-freq-atom (Math/pow 2 (/ % 12)))
-                            (range 13))))
+  [f]
+  (get-closest-seq-freq f (map #(* @tonic-freq-atom (Math/pow 2 (/ % 12)))
+                               (range 13))))
 
 (defn get-closest-consonance-freq
-  [x]
-  (get-closest-freq* x (concat (list @tonic-freq-atom)
-                               (keys @freq-histo-atom)
-                               (list (* 2 @tonic-freq-atom)))))
+  [f]
+  (get-closest-seq-freq f (keys @freq-histo-atom)))
 
 (defn get-closest-freq
   [x y]
-  (if (> y (/ (q/height) 2))
-    (get-closest-diatonic-freq x)
-    (get-closest-consonance-freq x)))
+  (let [b 50
+        f (q/lerp @tonic-freq-atom (* 2 @tonic-freq-atom)
+                  (/ (- x b) (- (q/width) (* 2 b))))]
+    (if (> y (/ (q/height) 2))
+      (get-closest-diatonic-freq f)
+      (get-closest-consonance-freq f))))
 
 (defn mouse-button []
   (let [x (q/mouse-x)
@@ -224,9 +215,10 @@
 ;; - in the top area, it will snap to the nearest consonance note
 ;; - in the bottom area, it will snap to the nearest diatonic note
 
+;; check out the difference between the values near E and F
+
 ;; use (o/stop) if it gets stuck playing
 
-;; (set-tonic-freq 110)
+;; (set-tonic-freq 130)
 ;; (set-num-octaves 7)
-
 ;; (set-num-octaves 50)
