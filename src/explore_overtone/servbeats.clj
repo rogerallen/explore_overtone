@@ -77,6 +77,19 @@
 (def clap (o/sample (o/freesound-path 48310)))
 (def gshake (o/sample (o/freesound-path 113625)))
 
+;; control atoms
+(defonce root-trg-atom (atom nil))
+(defonce root-cnt-atom (atom nil))
+(defonce beat-trgs-atom (atom []))
+(defonce beat-cnts-atom (atom []))
+;; list of o/buffers.  one for each sequence. buffers are the length
+;; of the corresponding sequence and contain either 1 or 0 to control
+;; playing the sample on that beat.  Initialized to be all 0
+(defonce seq-bufs-atom (atom []))
+;; a vector of vectors of synths.  each sequence contatains one synth
+;; per beat that plays the sample
+(defonce synth-seqs-atom (atom []))
+
 ;; get all busses counting and running
 (defn restart [seq-seconds
                beat-seq-beats
@@ -85,85 +98,89 @@
     (assert (>= MAX-BEAT-BUSES (count beat-set)))
     (assert (= (count beat-seq-beats) (count beat-seq-synths)))
 
-    (def root-trg (root-trg-synth))
-    (def root-cnt (root-cnt-synth))
-    (def beat-trgs
-      (dovec (for [i (range (count beat-set))]
-               (let [beat-trg-bus (nth beat-trg-buses i)
-                     num-beats    (nth beat-set i)
-                     cur-divisor  (get-rate-divisor num-beats seq-seconds DEFAULT-ROOT-RATE)]
-                 (beat-trg-synth beat-trg-bus cur-divisor)))))
-    (def beat-cnts
-      (dovec (for [i (range (count beat-set))]
-               (let [beat-trg-bus (nth beat-trg-buses i)
-                     beat-cnt-bus (nth beat-cnt-buses i)]
-                 (beat-cnt-synth beat-cnt-bus beat-trg-bus)))))
-    (def seq-bufs
-      "list of o/buffers.  one for each sequence. buffers are the
-       length of the corresponding sequence and contain either 1 or 0
-       to control playing the sample on that beat.  Initialized to be all 0"
-      (dovec (for [num-beats beat-seq-beats]
-               (o/buffer num-beats))))
+    (swap! root-trg-atom (fn [_] (root-trg-synth)))
+    (swap! root-cnt-atom (fn [_] (root-cnt-synth)))
+    (swap! beat-trgs-atom
+           (fn [_] (dovec (for [i (range (count beat-set))]
+                           (let [beat-trg-bus (nth beat-trg-buses i)
+                                 num-beats    (nth beat-set i)
+                                 cur-divisor  (get-rate-divisor num-beats seq-seconds DEFAULT-ROOT-RATE)]
+                             (beat-trg-synth beat-trg-bus cur-divisor))))))
+    (swap! beat-cnts-atom
+           (fn [_] (dovec (for [i (range (count beat-set))]
+                           (let [beat-trg-bus (nth beat-trg-buses i)
+                                 beat-cnt-bus (nth beat-cnt-buses i)]
+                             (beat-cnt-synth beat-cnt-bus beat-trg-bus))))))
+    (swap! seq-bufs-atom
+           (fn [_] (dovec (for [num-beats beat-seq-beats]
+                           (o/buffer num-beats)))))
 
-    (def synth-seqs
-      "a vector of vectors of synths.  each sequence contatains one synth per beat"
-      (dovec (for [[seq-index num-beats] (map-indexed vector beat-seq-beats)]
-               (let [beat-index (.indexOf beat-set num-beats)
-                     seq-buf      (nth seq-bufs seq-index)
-                     beat-cnt-bus (nth beat-cnt-buses beat-index)
-                     beat-trg-bus (nth beat-trg-buses beat-index)
-                     synth        (nth beat-seq-synths seq-index)]
-                 (dovec
-                  (for [k (range num-beats)]
-                    (mono-sample-beat-synth
-                     :beat-num     k
-                     :beat-buf     seq-buf
-                     :seq-beats    num-beats
-                     :beat-cnt-bus beat-cnt-bus
-                     :beat-trg-bus beat-trg-bus
-                     :sample-buf   synth)))))))))
-
-(defn set-seq-sample-buf
-  [seq-index sample-buf]
-  (doall (map #(o/ctl % :sample-buf sample-buf) (synth-seqs seq-index)))
-  nil)
+    (swap! synth-seqs-atom
+      (fn [_] (dovec (for [[seq-index num-beats] (map-indexed vector beat-seq-beats)]
+                      (let [beat-index (.indexOf beat-set num-beats)
+                            seq-buf      (nth @seq-bufs-atom seq-index)
+                            beat-cnt-bus (nth beat-cnt-buses beat-index)
+                            beat-trg-bus (nth beat-trg-buses beat-index)
+                            synth        (nth beat-seq-synths seq-index)]
+                        (dovec
+                         (for [k (range num-beats)]
+                           (mono-sample-beat-synth
+                            :beat-num     k
+                            :beat-buf     seq-buf
+                            :seq-beats    num-beats
+                            :beat-cnt-bus beat-cnt-bus
+                            :beat-trg-bus beat-trg-bus
+                            :sample-buf   synth))))))))))
 
 (defn set-seq-ctl
   [seq-index key value]
-  (doall (map #(o/ctl % key value) (synth-seqs seq-index)))
+  (doall (map #(o/ctl % key value) (@synth-seqs-atom seq-index)))
   nil)
 
 (defn set-seq-buf
   [seq-index new-buf]
-  (o/buffer-write! (nth seq-bufs seq-index) new-buf)
+  (o/buffer-write! (nth @seq-bufs-atom seq-index) new-buf)
   nil)
 
-;; (o/stop)
-(restart 4 ;; seconds/sequence
-         [16     12    12  ]
-         [kick-s kick-s close-hihat])
+(comment
 
-;; adjust tempo via (o/ctl root-trg :rate 144)
+  (o/stop)
+  (restart 4 [16     12     12          8]
+             [kick-s kick-s close-hihat open-hihat])
 
-;;                                1 1 1 1 1 1 1
-;;              1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
-(set-seq-buf 0 [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0])
-(set-seq-buf 1 [1 0 1 0 1 0 1 0 1 0 1 0])
-(set-seq-buf 2 [0 1 0 1 0 1 0 1 0 1 0 1])
+  (do
+    ;;                                1 1 1 1 1 1 1
+    ;;              1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
+    (set-seq-buf 0 [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0])
+    (set-seq-buf 1 [1 0 1 0 1 0 1 0 1 0 1 0])
+    (set-seq-buf 2 [0 1 0 1 0 1 0 1 0 1 0 1])
+    (set-seq-buf 3 [0 1 0 1 0 1 0 1])
+    )
 
-(set-seq-buf 1 [1 1 1 0 1 1 1 0 1 1 1 0])
-(set-seq-buf 2 [0 0 0 1 0 0 0 1 0 0 0 1])
+  (do
+    ;;                                1 1 1 1 1 1 1
+    ;;              1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
+    (set-seq-buf 0 [1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0])
+    (set-seq-buf 1 [1 0 0 0 1 0 0 0 1 0 0 0])
+    (set-seq-buf 2 [0 0 0 1 0 0 0 1 0 0 0 1])
+    (set-seq-buf 3 [0 1 0 1 0 0 0 1])
+    )
+
+  (do
+    ;;                                1 1 1 1 1 1 1
+    ;;              1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
+    (set-seq-buf 0 [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0])
+    (set-seq-buf 1 [1 0 1 0 1 0 1 0 1 0 1 0])
+    (set-seq-buf 2 [0 1 0 0 0 1 0 0 0 1 0 0])
+    (set-seq-buf 3 [0 0 1 1 0 0 1 1])
+    )
 
 
+  ;; adjust tempo via
+  (o/ctl @root-trg-atom :rate 124)
 
+  ;; adjust sound via
+  (set-seq-ctl 1 :sample-buf kick-s)
+  (set-seq-ctl 3 :amp 0.65)
 
-(set-seq-buf 1 [0 1 0 0 0 1 1 0 0 1 0 0 0 1 1 0])
-(set-seq-buf 4 [0 0 0 1 0 0 0 1 0 0 1 0])
-
-(set-seq-sample-buf 1 kick-s)
-(set-seq-sample-buf 2 click-s)
-(set-seq-sample-buf 2 open-hihat)
-(set-seq-sample-buf 2 close-hihat)
-(set-seq-sample-buf 2 gshake)
-
-(set-seq-ctl 2 :amp 0.5)
+)
