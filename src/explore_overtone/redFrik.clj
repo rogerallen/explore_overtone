@@ -59,11 +59,13 @@
 ;;   Exception Invalid ugen tree passed to topological-sort-ugens, maybe you have cycles in the synthdef...
 ;;   overtone.sc.synth/topological-sort-ugens (synth.clj:415)
 ;;
+;; Opened up issue https://github.com/overtone/overtone/issues/231 and
+;; Rich Hickey dropped by to fix this.  Neat!
 (defsynth red-frik-333317729073381377
   []
   (out 0
        (/ (mix ;; docs suggest this is the same as 'mean'
-           (for [i (range 39)] ;; 40 starts fail, see above
+           (for [i (range 50)]
              (ringz:ar (* (blip:ar (+ (* (> (lf-saw:ar (/ (+ i 1) [3 4]))
                                             (+ (lf-saw:ar (/ (+ i 1) 8)) 1))
                                          25)
@@ -73,7 +75,7 @@
                                      (/ i 25)))
                        (* (+ i 1) 99)
                        0.1)))
-          40))) ;; reduce volume to avoid clipping
+          5)))
 
 (red-frik-333317729073381377)
 (stop)
