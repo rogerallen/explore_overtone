@@ -78,6 +78,7 @@
           5)))
 
 (red-frik-333317729073381377)
+(show-graphviz-synth red-frik-333317729073381377)
 (stop)
 
 ;; May 1, 2013
@@ -193,6 +194,7 @@
 ;; (defsynth red-frik-329311535723839489 [] (out 0 (rlpf:ar (distort (leak-dc:ar (lf-tri:ar (* (leak-dc:ar (sum (for [x (range 1 9)] (pan2:ar (> (lf-tri:ar (/ 1 x) (/ x 3)) 0.3333) (lf-tri:ar (/ 666 x)))))) 999)))) 3e3)))
 
 (red-frik-329311535723839489)
+(show-graphviz-synth red-frik-329311535723839489)
 (stop)
 
 ;; https://twitter.com/redFrik/status/356151997256306691
@@ -230,4 +232,50 @@
 ;; I needed to amplify it a bit...
 
 (red-frik-356151997256306691)
+(show-graphviz-synth red-frik-356151997256306691)
+(stop)
+
+;; https://twitter.com/redFrik/status/361960894818811905
+;; play{b=(1,3.075..16);a=SinOsc;GVerb.ar(Splay.ar(a.ar(1/b,3*a.ar(b*Duty.ar(b,0,Dseq(b+23,inf).midicps).lag(2))).tanh/5),90)}
+;; play{
+;;   b=(1,3.075..16);
+;;   GVerb.ar(
+;;     Splay.ar(
+;;       SinOsc.ar(
+;;         1/b,
+;;         3*SinOsc.ar(
+;;           b*Duty.ar(
+;;             b,
+;;             0,
+;;             Dseq(
+;;               b+23,
+;;               inf).midicps
+;;           ).lag(2)
+;;         )
+;;       ).tanh/5
+;;     ),
+;;     90
+;;   )
+;; }
+
+;; Hmm, not quite right...will circle back to finish this.
+(defsynth red-frik-361960894818811905 []
+  (out 0
+       (g-verb:ar
+        (splay:ar
+         (for [b (range 1 16 2.075)]
+           (/ (tanh
+               (sin-osc:ar
+                (/ b)
+                (* 3 (sin-osc:ar
+                      (* b (lag (duty:ar
+                                 b
+                                 0
+                                 (midicps (dseq (+ b 23) INF)))
+                                2))))))
+              5)))
+        90)))
+
+(red-frik-361960894818811905)
+(show-graphviz-synth red-frik-361960894818811905)
 (stop)

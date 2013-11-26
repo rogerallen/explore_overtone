@@ -134,8 +134,6 @@ Dmaj has F# and C#
         saw3   (o/hpf saw2 30) ;; freq???
         ]
     (o/out out-bus (* amp saw3))))
-;;(def c (cello :position :head :pitch 42 :out-bus b0))
-;;(o/ctl c :gate 0)
 
 (o/defsynth effect [out-bus 0 in-bus 1
                     mix 0.33 room 0.5 damp 0.5]
@@ -149,15 +147,18 @@ Dmaj has F# and C#
                   ;; :drylevel drylevel :earlyreflevel earlyreflevel :taillevel taillevel)
                   )))
 
+(def g0 (o/group))
 (def b0 (o/audio-bus 1))
 
-(def e (effect :position :tail :in-bus b0))
-;;(o/ctl e :revtime 0.25 :damping 0.95)
+(def e (effect [:tail g0] :in-bus b0))
+;;(def c (cello [:head g0]:pitch 42 :out-bus b0))
+;;(o/ctl c :gate 0)
+;;(o/ctl e :revtime 0.125 :damping 0.99)
 ;;(def c (cello :position :head :pitch 42 :out-bus b0))
 ;;(o/ctl c :gate 0)
 
 (defmethod ll/play-note :default [{:keys [pitch time duration]}]
-  (let [cid (cello :position :head :pitch (- pitch 24) :out-bus b0)]
+  (let [cid (cello [:head g0] :pitch (- pitch 12) :out-bus b0)]
     (o/at (+ time duration) (o/ctl cid :gate 0))))
 
 (comment

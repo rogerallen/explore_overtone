@@ -53,8 +53,9 @@
 
 ;; ======================================================================
 ;; midi control
-;; 72bpm
 (def mpp (midi-poly-player sawbble-synth))
+
+;; 72bpm
 (def bpm0 72)
 (defn spb [beats tempo]
   (let [bps (/ tempo 60)]
@@ -81,6 +82,9 @@
                             :adsr-curve          4)))
 (midi-player-stop)
 ;;(synth-controller sawbble-synth)
+
+;; new in 0.9 graphviz output
+(show-graphviz-synth sawbble-synth)
 
 ;; ======================================================================
 ;; some things to play with...
