@@ -16,37 +16,39 @@
 ;; I think something like this provides realtime control of
 ;; tempo/timing with clojure abstraction:
 ;;
-;; ----------------------------------------------
-;;   [compose/create notes]    clojure process
-;;           |                   "composer"
-;;           V
-;;     [conduct notes]           "conductor"
-;;        ^       |
-;; -------|-------|-----------------------------
-;;        |       V           scsynth process
-;; timing |  [FIFO buffer]       "player"
-;;   &    |       |
-;;  ctl   |       V
-;;  sigs  +->[note-synth]
-;;        |       |
-;;        |       V
-;;        +->[audio-synth]
-;;                |
-;;                V
-;;              audio
+;; ----------------------------------------------------
+;;                                   clojure process
+;;     [conduct]------>[compose]   "composer/conductor"
+;;        ^              |  ^
+;; -------|--------------|--|--------------------------
+;;        |              |  |        scsynth process
+;;        |        ......|..|.......     "player"
+;;        |        :play |  |      :
+;;        |        :     V  |      :
+;; timing |        : [FIFO buffer] :
+;;   &    |        :      |        :
+;;  ctl   |        :      V        :
+;;  sigs  +---------->[note-synth] :
+;;        |        :      |        :
+;;        |        :      V        :
+;;        +--------->[audio-synth] :
+;;                 :......|........:
+;;                        V
+;;                      audio
 ;;
-;; To start, you'd create and send a few notes to the fifo, until it
-;; was full.  You would want to schedule them to be played slightly in
-;; the future so the note synth does not get confused.  The scsynth
-;; process would watch for valid data and play the notes from the
-;; fifo.  The performer side uses a FIFO "full" signal to communicate
-;; with the the conductor.  When the fifo has room, add more notes
+;; To start, the composer process creates and sends a few notes to the
+;; fifo, until it becomes full.  N.B the composer will want to
+;; schedule them to be played slightly in the future so the note synth
+;; does not get confused.  The scsynth process would watch for valid
+;; data and play the notes from the fifo at the proper time.  The
+;; performer side uses a FIFO "full" signal to communicate with the
+;; the composer.  When the fifo has room, the composer adds more notes
 ;; until your song is complete.  So, now you have the ability to
 ;; stream an endless song.
 ;;
-;; You are not limited by sending data through the fifo only.  You may
-;; adjust the tempo and other performance information in real time, by
-;; using ctl signals.
+;; The conductor controls coordinating the composition process and the
+;; performance.  The conductor may adjust the tempo and other
+;; performance information in real time, by using ctl signals.
 ;;
 ;; [1] https://github.com/overtone/overtone/blob/master/src/overtone/examples/timing/internal_sequencer.clj
 ;; [2] https://github.com/ctford/leipzig
@@ -58,19 +60,30 @@
 ;;
 ;; max (:control-rate (server-info)) => 689.0625
 (def TICKS-PER-SEC 300) ;; 500 had issues. FIXME--what are limits?
-(def NOTES-PER-FIFO 4)  ;; FIFO size
+;; FIFO size. Larger numbers allow for more separation & slower
+;; composition.  Smaller numbers allow for less distance between the
+;; conductor & composer.
+(def NOTES-PER-FIFO 4)
 
 (defn beats-per-tick
   [tempo]
   (/ TICKS-PER-SEC (/ tempo 60)))
 
+;; ----------------------------------------------------------------------
 ;; conductor communicates via a fifo of note-on/off/value tuples
+;; these are per-voice, not global
 (defonce note-on-fifo-buf  (buffer NOTES-PER-FIFO))
 (defonce note-off-fifo-buf (buffer NOTES-PER-FIFO))
 (defonce note-val-fifo-buf (buffer NOTES-PER-FIFO))
 (defonce fifo-wr-ptr-buf   (buffer 1)) ;; cur write index. use modulo
                                        ;; for actual index
+(defonce note-on-fifo-buf2  (buffer NOTES-PER-FIFO))
+(defonce note-off-fifo-buf2 (buffer NOTES-PER-FIFO))
+(defonce note-val-fifo-buf2 (buffer NOTES-PER-FIFO))
+(defonce fifo-wr-ptr-buf2   (buffer 1)) ;; cur write index. use modulo
+                                       ;; for actual index
 
+;; ----------------------------------------------------------------------
 ;; Next let's create some global timing buses.
 (defonce tick-trg-bus  (control-bus)) ;; global metronome pulse
 (defonce tick-cnt-bus  (control-bus)) ;; global metronome count
@@ -78,12 +91,20 @@
 (defonce beat-cnt-bus  (control-bus)) ;; beat count
 
 ;; these are per-voice, not global
-(defonce fifo-trg-bus  (control-bus)) ;; move to next in fifo
+(defonce fifo-trg-bus  (control-bus)) ;; move to next note in fifo
 (defonce fifo-cnt-bus  (control-bus)) ;; fifo read index counter. use
                                       ;; modulo for actual index
 (defonce note-gate-bus (control-bus)) ;; tell the audio synth to turn on/off
 (defonce note-val-bus  (control-bus)) ;; tell the audio synth what note to play
 
+;; these are per-voice, not global
+(defonce fifo-trg-bus2  (control-bus)) ;; move to next note in fifo
+(defonce fifo-cnt-bus2  (control-bus)) ;; fifo read index counter. use
+                                       ;; modulo for actual index
+(defonce note-gate-bus2 (control-bus)) ;; tell the audio synth to turn on/off
+(defonce note-val-bus2  (control-bus)) ;; tell the audio synth what note to play
+
+;; ----------------------------------------------------------------------
 ;; Here we design synths that will drive our pulse buses.
 (defsynth tick-trg [rate TICKS-PER-SEC]
   (out:kr tick-trg-bus (impulse:kr rate)))
@@ -97,47 +118,65 @@
 (defsynth beat-cnt [reset 0]
   (out:kr beat-cnt-bus (pulse-count (in:kr beat-trg-bus) reset)))
 
-(defsynth fifo-cnt [reset 0]
+(defsynth fifo-cnt [fifo-trg-bus 0 reset 0]
   (out:kr fifo-cnt-bus (pulse-count (in:kr fifo-trg-bus) reset)))
 
 ;; This synth watches the fifo and controls the audio synth
-(defsynth note-synth []
+(defsynth note-synth [fifo-cnt-bus      0
+                      fifo-trg-bus      0
+                      note-gate-bus     0
+                      note-val-bus      0
+                      note-on-fifo-buf  0
+                      note-off-fifo-buf 0
+                      note-val-fifo-buf 0
+                      fifo-wr-ptr-buf   0
+                      ]
   (let [fifo-wr-ptr   (buf-rd:kr 1 fifo-wr-ptr-buf 0.0 0 1)
         fifo-rd-ptr   (in:kr fifo-cnt-bus)
-        _             (tap "wr-ptr" 10 fifo-wr-ptr)
-        _             (tap "rd-ptr" 10 fifo-rd-ptr)
+        _debug_       (tap "wr-ptr" 10 fifo-wr-ptr)
+        _debug_       (tap "rd-ptr" 10 fifo-rd-ptr)
         fifo-rd-index (mod (in:kr fifo-cnt-bus) NOTES-PER-FIFO)
         fifo-empty    (= fifo-wr-ptr fifo-rd-ptr)
-        _              (tap "empty" 10 fifo-empty)
+        _debug_       (tap "empty" 10 fifo-empty)
         fifo-vld      (- 1.0 fifo-empty)
-        _              (tap "valid" 10 fifo-vld)
+        _debug_       (tap "valid" 10 fifo-vld)
         fifo-full     (= (- fifo-wr-ptr fifo-rd-ptr) NOTES-PER-FIFO)
-        _              (tap "full" 10 fifo-full) ;; this is the only
-        note-on        (buf-rd:kr 1 note-on-fifo-buf fifo-rd-index 0 1)
-        note-off       (buf-rd:kr 1 note-off-fifo-buf fifo-rd-index 0 1)
-        note-val       (buf-rd:kr 1 note-val-fifo-buf fifo-rd-index 0 1)
-        beat-trg       (in:kr beat-trg-bus)
-        beat-cnt       (in:kr beat-cnt-bus)
-        _              (tap "beat" 10 beat-cnt)
-        gate-note      (set-reset-ff:kr (and fifo-vld (>= beat-cnt note-on))
-                                        (>= beat-cnt note-off))
-        _              (tap "gate" 10 gate-note)
+        _             (tap "full" 10 fifo-full) ;; the only required tap
+        note-on       (buf-rd:kr 1 note-on-fifo-buf fifo-rd-index 0 1)
+        note-off      (buf-rd:kr 1 note-off-fifo-buf fifo-rd-index 0 1)
+        note-val      (buf-rd:kr 1 note-val-fifo-buf fifo-rd-index 0 1)
+        beat-trg      (in:kr beat-trg-bus)
+        beat-cnt      (in:kr beat-cnt-bus)
+        _debug_       (tap "beat" 10 beat-cnt)
+        gate-note     (set-reset-ff:kr (and fifo-vld (>= beat-cnt note-on))
+                                       (>= beat-cnt note-off))
+        _             (tap "gate" 10 gate-note)
         fifo-trg      (and fifo-vld (>= beat-cnt note-off))]
-    (out:kr fifo-trg-bus  fifo-trg)  ;; increment read pointer
-    (out:kr note-gate-bus gate-note) ;; turn on the note
-    (out:kr note-val-bus  note-val)))
+    (out:kr fifo-trg-bus  fifo-trg)   ;; increment read pointer
+    (out:kr note-gate-bus gate-note)  ;; turn on the note
+    (out:kr note-val-bus  note-val))) ;; note value
 ;;(show-graphviz-synth note-synth)
 
 ;; A simple audio synth.
-(defsynth audio-synth [lp-freq 1200 lp-res 0.25]
-  (let [gate-note     (in:kr note-gate-bus)
-        note-val      (in:kr note-val-bus)
-        env           (env-gen (asr 0.1 1.0 0.1) :gate gate-note)
-        snd           (pulse:ar (midicps note-val) 0.6)
-        snd           (mix [snd (pulse:ar (midicps (- note-val 24)) 0.4)])
-        snd           (rlpf snd lp-freq lp-res)
-        snd           (* env snd)]
-    (out:ar 0 (pan2 snd))))
+(defsynth audio-synth [note-gate-bus 0
+                       note-val-bus  0
+                       audio-out-bus 0
+                       attack        0.05
+                       release       0.2
+                       pulse-width1  0.3
+                       pulse-width2  0.8
+                       pan-pos       0.0
+                       note-offset  12
+                       lp-freq    1200
+                       lp-res        0.25]
+  (let [gate-note (in:kr note-gate-bus)
+        note-val  (in:kr note-val-bus)
+        env       (env-gen (asr attack 1.0 release) :gate gate-note)
+        snd       (pulse:ar (midicps note-val) pulse-width1)
+        snd       (mix [snd (pulse:ar (midicps (+ note-val note-offset)) pulse-width2)])
+        snd       (rlpf snd lp-freq lp-res)
+        snd       (* env snd)]
+    (out:ar audio-out-bus (pan2 snd pan-pos))))
 ;;(show-graphviz-synth audio-synth)
 
 ;; ======================================================================
@@ -164,15 +203,14 @@
            "full"   @(get-in performer-note-synth [:taps "full"])
            "valid"  @(get-in performer-note-synth [:taps "valid"])
            "gate"   @(get-in performer-note-synth [:taps "gate"])
-           "beat"   @(get-in performer-note-synth [:taps "beat"]))
-  ;;(println "notes" (map #(nth (buffer-read note-val-fifo-buf) %) (range 4)))
-  ;;(println "ons  " (map #(nth (buffer-read note-on-fifo-buf) %) (range 4)))
-  ;;(println "offs " (map #(nth (buffer-read note-off-fifo-buf) %) (range 4)))
-  )
+           "beat"   @(get-in performer-note-synth [:taps "beat"])))
+;  (println "notes" (map #(nth (buffer-read note-val-fifo-buf) %) (range 4)))
+;  (println "ons  " (map #(nth (buffer-read note-on-fifo-buf) %) (range 4)))
+;  (println "offs " (map #(nth (buffer-read note-off-fifo-buf) %) (range 4))))
 
 (defn tap-tap-tap
   "get the conductor & performer back to a good initial condition"
-  [beat-counter fifo-counter]
+  [beat-counter fifo-counter fifo-wr-ptr-buf]
   (start-conductor)
   (buffer-write! fifo-wr-ptr-buf [0])
   (ctl beat-counter :reset 1) ;; beat-count => 0
@@ -197,7 +235,9 @@
 
 (defn send-note
   "the performer has room, send some notes.  return remaining notes, lengths & durations"
-  [cur-notes cur-note-ons cur-note-offs]
+  [cur-notes cur-note-ons cur-note-offs
+   note-on-fifo-buf note-off-fifo-buf
+   note-val-fifo-buf fifo-wr-ptr-buf]
   (let [wr-ptr (nth (buffer-read fifo-wr-ptr-buf) 0)
         wr-index (mod (int wr-ptr) NOTES-PER-FIFO)]
     ;;(println "  send a note")
@@ -212,13 +252,19 @@
 
 (defn try-send-note
   "try sending note to the performer.  return remaining notes, lengths & durations"
-  [performer-note-synth cur-notes cur-ons cur-offs]
+  [performer-note-synth cur-notes cur-ons cur-offs
+   note-on-fifo-buf note-off-fifo-buf
+   note-val-fifo-buf fifo-wr-ptr-buf]
   (if (performer-has-room? performer-note-synth)
-    (send-note cur-notes cur-ons cur-offs)
+    (send-note cur-notes cur-ons cur-offs
+               note-on-fifo-buf note-off-fifo-buf
+               note-val-fifo-buf fifo-wr-ptr-buf)
     [cur-notes cur-ons cur-offs]))
 
 (defn beethoven
-  [beat-counter fifo-counter performer-note-synth]
+  [beat-counter fifo-counter performer-note-synth
+   note-on-fifo-buf note-off-fifo-buf
+   note-val-fifo-buf fifo-wr-ptr-buf]
   (let [;; a bit of "ode to joy"
         all-notes (map note [:e4 :e4 :f4 :g4
                              :g4 :f4 :e4 :d4
@@ -245,43 +291,72 @@
         ;; let's start on beat 4...
         [all-ons all-offs] (get-note-ons-offs 4 all-lens all-durs)]
     (println "beethoven start")
-    (tap-tap-tap beat-counter fifo-counter)
+    (tap-tap-tap beat-counter fifo-counter fifo-wr-ptr-buf)
     (loop [cur-notes all-notes
            cur-ons   all-ons
            cur-offs  all-offs]
-      ;;(print-status performer-note-synth)
+      (print-status performer-note-synth)
       ;;(println "loop" cur-notes cur-lens cur-durs)
       (assert (== (count cur-notes) (count cur-ons) (count cur-offs)))
       (if (or (not @conductor-alive) (empty? cur-notes))
         (println "beethoven done") ;; be done, else play your notes
         (let [_ (println (count cur-notes) "notes remain")
-              [nxt-notes nxt-ons nxt-offs] (try-send-note
-                                            performer-note-synth
-                                            cur-notes cur-ons cur-offs)]
+              [nxt-notes nxt-ons nxt-offs] (try-send-note performer-note-synth
+                                                          cur-notes cur-ons cur-offs
+                                                          note-on-fifo-buf note-off-fifo-buf
+                                                          note-val-fifo-buf fifo-wr-ptr-buf)]
           (Thread/sleep CONDUCTOR-SLEEP-TIME)
           (recur nxt-notes nxt-ons nxt-offs))))))
 
 (comment
   (do
     (stop)
-    (def tick-trigger   (tick-trg))
-    (def tick-counter   (tick-cnt [:after tick-trigger]))
-    (def beat-trigger   (beat-trg [:after tick-trigger] (beats-per-tick 120)))
-    (def beat-counter   (beat-cnt [:after beat-trigger]))
-    (def note-performer (note-synth))
-    (def snd-performer  (audio-synth [:after note-performer]))
-    (def fifo-counter   (fifo-cnt [:after note-performer]))
-    (tap-tap-tap beat-counter fifo-counter))
+    (def tick-trigger    (tick-trg))
+    (def tick-counter    (tick-cnt [:after tick-trigger]))
+    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 120)))
+    (def beat-counter    (beat-cnt [:after beat-trigger]))
+    ;; 1
+    (def note-performer  (note-synth fifo-cnt-bus fifo-trg-bus note-gate-bus note-val-bus
+                                     note-on-fifo-buf note-off-fifo-buf
+                                     note-val-fifo-buf fifo-wr-ptr-buf))
+    (def snd-performer   (audio-synth [:after note-performer] note-gate-bus note-val-bus 0 :pan-pos -1.0))
+    (def fifo-counter    (fifo-cnt [:after note-performer] fifo-trg-bus))
+    (tap-tap-tap beat-counter fifo-counter fifo-wr-ptr-buf)
+    ;; 2
+    (def note-performer2 (note-synth fifo-cnt-bus2 fifo-trg-bus2 note-gate-bus2 note-val-bus2
+                                     note-on-fifo-buf2 note-off-fifo-buf2
+                                     note-val-fifo-buf2 fifo-wr-ptr-buf2))
+    (def snd-performer2  (audio-synth [:after note-performer2] note-gate-bus2 note-val-bus2 0 :pan-pos 1.0))
+    (def fifo-counter2   (fifo-cnt [:after note-performer2] fifo-trg-bus2))
+    (tap-tap-tap beat-counter fifo-counter2 fifo-wr-ptr-buf2)
+    )
 
-  ;; put conductor in another thread to allow for realtime control
-  (def bp (future (beethoven beat-counter fifo-counter note-performer)))
+  ;; put composer in another thread to allow for realtime control
+  (do
+    (def bp (future (beethoven beat-counter fifo-counter note-performer
+                               note-on-fifo-buf note-off-fifo-buf
+                               note-val-fifo-buf fifo-wr-ptr-buf)))
+    (def bp2 (future (beethoven beat-counter fifo-counter2 note-performer2
+                                note-on-fifo-buf2 note-off-fifo-buf2
+                                note-val-fifo-buf2 fifo-wr-ptr-buf2)))
+    )
+
+  (stop-conductor)
+  ;; you're the conductor...
   ;; realtime control of tempo
-  (ctl beat-trigger :div (beats-per-tick 120))
   (ctl beat-trigger :div (beats-per-tick 240))
   (ctl beat-trigger :div (beats-per-tick 480))
   ;; realtime control of audio synth
-  (ctl snd-performer :lp-freq 800)
-  (ctl snd-performer :lp-freq 2800)
+  (ctl snd-performer :attack 0.25)
+  (ctl snd-performer :release 0.3)
+  (ctl snd-performer :pulse-width1 0.8)
+  (ctl snd-performer :pulse-width2 0.8)
+  (ctl snd-performer :pan-pos -1.0)
+  (ctl snd-performer :note-offset 7)
+  (ctl snd-performer :lp-freq 1000)
+  (ctl snd-performer :lp-freq 2000)
+  (ctl snd-performer :lp-res  0.6)
 
+  (ctl snd-performer2 :pan-pos 0.5)
   (print-status performer-note-synth)
 )
