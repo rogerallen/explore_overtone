@@ -72,16 +72,20 @@
 ;; ----------------------------------------------------------------------
 ;; conductor communicates via a fifo of note-on/off/value tuples
 ;; these are per-voice, not global
+;; FIXME - change to a single fifo that accesses "packets" of data
+;;       - the size of the packet can be adjusted in the note & audio-synth
+;;       - e.g. percussion = single entry for note-on time
+;;       - e.g. add amplitude to note control, etc.
 (defonce note-on-fifo-buf  (buffer NOTES-PER-FIFO))
 (defonce note-off-fifo-buf (buffer NOTES-PER-FIFO))
 (defonce note-val-fifo-buf (buffer NOTES-PER-FIFO))
-(defonce fifo-wr-ptr-buf   (buffer 1)) ;; cur write index. use modulo
-                                       ;; for actual index
+;; cur write index. use modulo for actual index
+(defonce fifo-wr-ptr-buf   (buffer 1))
+;; #2
 (defonce note-on-fifo-buf2  (buffer NOTES-PER-FIFO))
 (defonce note-off-fifo-buf2 (buffer NOTES-PER-FIFO))
 (defonce note-val-fifo-buf2 (buffer NOTES-PER-FIFO))
-(defonce fifo-wr-ptr-buf2   (buffer 1)) ;; cur write index. use modulo
-                                       ;; for actual index
+(defonce fifo-wr-ptr-buf2   (buffer 1))
 
 ;; ----------------------------------------------------------------------
 ;; Next let's create some global timing buses.
@@ -96,13 +100,11 @@
                                       ;; modulo for actual index
 (defonce note-gate-bus (control-bus)) ;; tell the audio synth to turn on/off
 (defonce note-val-bus  (control-bus)) ;; tell the audio synth what note to play
-
-;; these are per-voice, not global
-(defonce fifo-trg-bus2  (control-bus)) ;; move to next note in fifo
-(defonce fifo-cnt-bus2  (control-bus)) ;; fifo read index counter. use
-                                       ;; modulo for actual index
-(defonce note-gate-bus2 (control-bus)) ;; tell the audio synth to turn on/off
-(defonce note-val-bus2  (control-bus)) ;; tell the audio synth what note to play
+;; #2
+(defonce fifo-trg-bus2  (control-bus))
+(defonce fifo-cnt-bus2  (control-bus))
+(defonce note-gate-bus2 (control-bus))
+(defonce note-val-bus2  (control-bus))
 
 ;; ----------------------------------------------------------------------
 ;; Here we design synths that will drive our pulse buses.
@@ -129,11 +131,10 @@
                       note-on-fifo-buf  0
                       note-off-fifo-buf 0
                       note-val-fifo-buf 0
-                      fifo-wr-ptr-buf   0
-                      ]
+                      fifo-wr-ptr-buf   0]
   (let [fifo-wr-ptr   (buf-rd:kr 1 fifo-wr-ptr-buf 0.0 0 1)
-        fifo-rd-ptr   (in:kr fifo-cnt-bus)
         _debug_       (tap "wr-ptr" 10 fifo-wr-ptr)
+        fifo-rd-ptr   (in:kr fifo-cnt-bus)
         _debug_       (tap "rd-ptr" 10 fifo-rd-ptr)
         fifo-rd-index (mod (in:kr fifo-cnt-bus) NOTES-PER-FIFO)
         fifo-empty    (= fifo-wr-ptr fifo-rd-ptr)
@@ -153,7 +154,7 @@
         _             (tap "gate" 10 gate-note)
         fifo-trg      (and fifo-vld (>= beat-cnt note-off))]
     (out:kr fifo-trg-bus  fifo-trg)   ;; increment read pointer
-    (out:kr note-gate-bus gate-note)  ;; turn on the note
+    (out:kr note-gate-bus gate-note)  ;; turn on/off the note
     (out:kr note-val-bus  note-val))) ;; note value
 ;;(show-graphviz-synth note-synth)
 
@@ -193,20 +194,23 @@
 
 ;; handy for debug.  Almost all taps are strictly for debug.  Only
 ;; "full" is really necessary.
-(defn print-status
+(defn print-synth-status
   [performer-note-synth]
   (println)
   (println "rd-ptr" @(get-in performer-note-synth [:taps "rd-ptr"])
            "wr-ptr" @(get-in performer-note-synth [:taps "wr-ptr"])
-           ;;"wr-ptr" (nth (buffer-read fifo-wr-ptr-buf) 0)
            "empty"  @(get-in performer-note-synth [:taps "empty"])
            "full"   @(get-in performer-note-synth [:taps "full"])
            "valid"  @(get-in performer-note-synth [:taps "valid"])
            "gate"   @(get-in performer-note-synth [:taps "gate"])
            "beat"   @(get-in performer-note-synth [:taps "beat"])))
-;  (println "notes" (map #(nth (buffer-read note-val-fifo-buf) %) (range 4)))
-;  (println "ons  " (map #(nth (buffer-read note-on-fifo-buf) %) (range 4)))
-;  (println "offs " (map #(nth (buffer-read note-off-fifo-buf) %) (range 4))))
+
+(defn print-fifo-status
+  [note-on-fifo-buf note-off-fifo-buf note-val-fifo-buf fifo-wr-ptr-buf]
+  (println "ons   " (map #(nth (buffer-read note-on-fifo-buf) %) (range 4)))
+  (println "offs  " (map #(nth (buffer-read note-off-fifo-buf) %) (range 4)))
+  (println "notes " (map #(nth (buffer-read note-val-fifo-buf) %) (range 4)))
+  (println "wr-ptr" (nth (buffer-read fifo-wr-ptr-buf) 0)))
 
 (defn tap-tap-tap
   "get the conductor & performer back to a good initial condition"
@@ -285,9 +289,9 @@
                    2   2   3   3
                    2   2   7]
         ;; simple tune for debug
-        ;;all-notes [60 64 67 69 60 64 67 69]
-        ;;all-lens  [2 2 2 2 2 2 2 2]
-        ;;all-durs  [1 1 1 1 1 1 1 1]
+        all-notes [60 64 67 69 60 64 67 69]
+        all-lens  [2 2 2 2 2 2 2 2]
+        all-durs  [1 1 1 1 1 1 1 1]
         ;; let's start on beat 4...
         [all-ons all-offs] (get-note-ons-offs 4 all-lens all-durs)]
     (println "beethoven start")
@@ -295,8 +299,9 @@
     (loop [cur-notes all-notes
            cur-ons   all-ons
            cur-offs  all-offs]
-      (print-status performer-note-synth)
-      ;;(println "loop" cur-notes cur-lens cur-durs)
+      (print-synth-status performer-note-synth)
+      (print-fifo-status note-on-fifo-buf note-off-fifo-buf
+                         note-val-fifo-buf fifo-wr-ptr-buf)
       (assert (== (count cur-notes) (count cur-ons) (count cur-offs)))
       (if (or (not @conductor-alive) (empty? cur-notes))
         (println "beethoven done") ;; be done, else play your notes
@@ -358,5 +363,5 @@
   (ctl snd-performer :lp-res  0.6)
 
   (ctl snd-performer2 :pan-pos 0.5)
-  (print-status performer-note-synth)
+  (print-synth-status note-performer)
 )
