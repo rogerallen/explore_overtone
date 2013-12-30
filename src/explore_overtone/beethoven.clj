@@ -64,6 +64,7 @@
 ;; composition.  Smaller numbers allow for less distance between the
 ;; conductor & composer.
 (def NOTES-PER-FIFO 4)
+(def FLOATS-PER-NOTE 3) ;; FIXME
 
 (defn beats-per-tick
   [tempo]
@@ -111,17 +112,11 @@
 (defsynth tick-trg [rate TICKS-PER-SEC]
   (out:kr tick-trg-bus (impulse:kr rate)))
 
-(defsynth tick-cnt [reset 0]
-  (out:kr tick-cnt-bus (pulse-count:kr (in:kr tick-trg-bus) reset)))
-
 (defsynth beat-trg [div 100]
   (out:kr beat-trg-bus (pulse-divider (in:kr tick-trg-bus) div)))
 
-(defsynth beat-cnt [reset 0]
-  (out:kr beat-cnt-bus (pulse-count (in:kr beat-trg-bus) reset)))
-
-(defsynth fifo-cnt [fifo-trg-bus 0 fifo-cnt-bus 0 reset 0]
-  (out:kr fifo-cnt-bus (pulse-count (in:kr fifo-trg-bus) reset)))
+(defsynth kr-counter [trg-bus 0 cnt-bus 0 reset 0]
+  (out:kr cnt-bus (pulse-count:kr (in:kr trg-bus) reset)))
 
 ;; This synth watches the fifo and controls the audio synth
 (defsynth note-synth [fifo-cnt-bus      0
@@ -319,58 +314,62 @@
   (do
     (stop)
     (def tick-trigger    (tick-trg))
-    (def tick-counter    (tick-cnt [:after tick-trigger]))
-    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 120)))
-    (def beat-counter    (beat-cnt [:after beat-trigger]))
+    (def tick-counter    (kr-counter [:after tick-trigger] tick-trg-bus tick-cnt-bus))
+    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 300)))
+    (def beat-counter    (kr-counter [:after beat-trigger] beat-trg-bus beat-cnt-bus))
     ;; 1
     (def note-performer  (note-synth fifo-cnt-bus fifo-trg-bus note-gate-bus note-val-bus
                                      note-on-fifo-buf note-off-fifo-buf
                                      note-val-fifo-buf fifo-wr-ptr-buf))
     (def snd-performer   (audio-synth [:after note-performer] note-gate-bus note-val-bus 0 :pan-pos -1.0))
-    (def fifo-counter    (fifo-cnt [:after note-performer] fifo-trg-bus fifo-cnt-bus))
+    (def fifo-counter    (kr-counter [:after note-performer] fifo-trg-bus fifo-cnt-bus))
 
     (def bp (future (beethoven beat-counter fifo-counter note-performer
                                note-on-fifo-buf note-off-fifo-buf
                                note-val-fifo-buf fifo-wr-ptr-buf)))
     )
+  (stop-conductor)
+  (stop)
 
   ;; test 2 - right ear...
   (do
     (stop)
     (def tick-trigger    (tick-trg))
-    (def tick-counter    (tick-cnt [:after tick-trigger]))
-    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 120)))
-    (def beat-counter    (beat-cnt [:after beat-trigger]))
+    (def tick-counter    (kr-counter [:after tick-trigger] tick-trg-bus tick-cnt-bus))
+    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 300)))
+    (def beat-counter    (kr-counter [:after beat-trigger] beat-trg-bus beat-cnt-bus))
     (def note-performer2 (note-synth fifo-cnt-bus2 fifo-trg-bus2 note-gate-bus2 note-val-bus2
                                      note-on-fifo-buf2 note-off-fifo-buf2
                                      note-val-fifo-buf2 fifo-wr-ptr-buf2))
     (def snd-performer2  (audio-synth [:after note-performer2] note-gate-bus2 note-val-bus2 0 :pan-pos 1.0))
-    (def fifo-counter2   (fifo-cnt [:after note-performer2] fifo-trg-bus2 fifo-cnt-bus2))
+    (def fifo-counter2   (kr-counter [:after note-performer2] fifo-trg-bus2 fifo-cnt-bus2))
     (def bp2 (future (beethoven beat-counter fifo-counter2 note-performer2
                                 note-on-fifo-buf2 note-off-fifo-buf2
                                 note-val-fifo-buf2 fifo-wr-ptr-buf2)))
     )
+  (stop-conductor)
+  (stop)
 
   ;; Test 3 - now try both
   (do
     (stop)
     (def tick-trigger    (tick-trg))
-    (def tick-counter    (tick-cnt [:after tick-trigger]))
-    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 120)))
-    (def beat-counter    (beat-cnt [:after beat-trigger]))
+    (def tick-counter    (kr-counter [:after tick-trigger] tick-trg-bus tick-cnt-bus))
+    (def beat-trigger    (beat-trg [:after tick-trigger] (beats-per-tick 300)))
+    (def beat-counter    (kr-counter [:after beat-trigger] beat-trg-bus beat-cnt-bus))
     ;; 1
     (def note-performer  (note-synth fifo-cnt-bus fifo-trg-bus note-gate-bus note-val-bus
                                      note-on-fifo-buf note-off-fifo-buf
                                      note-val-fifo-buf fifo-wr-ptr-buf))
     (def snd-performer   (audio-synth [:after note-performer] note-gate-bus note-val-bus 0 :pan-pos -1.0))
-    (def fifo-counter    (fifo-cnt [:after note-performer] fifo-trg-bus fifo-cnt-bus))
+    (def fifo-counter    (kr-counter [:after note-performer] fifo-trg-bus fifo-cnt-bus))
     ;;(tap-tap-tap beat-counter fifo-counter fifo-wr-ptr-buf)
     ;; 2
     (def note-performer2 (note-synth fifo-cnt-bus2 fifo-trg-bus2 note-gate-bus2 note-val-bus2
                                      note-on-fifo-buf2 note-off-fifo-buf2
                                      note-val-fifo-buf2 fifo-wr-ptr-buf2))
     (def snd-performer2  (audio-synth [:after note-performer2] note-gate-bus2 note-val-bus2 0 :pan-pos 1.0))
-    (def fifo-counter2   (fifo-cnt [:after note-performer2] fifo-trg-bus2 fifo-cnt-bus2))
+    (def fifo-counter2   (kr-counter [:after note-performer2] fifo-trg-bus2 fifo-cnt-bus2))
     ;;(tap-tap-tap beat-counter fifo-counter2 fifo-wr-ptr-buf2)
     )
 
