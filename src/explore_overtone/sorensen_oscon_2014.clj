@@ -3,19 +3,39 @@
         [overtone.inst.sampled-piano]
         [overtone.inst.drum]
         [overtone.inst.synth]))
-
-;; inspired by Andrew Sorensen OSCON 2014 Keynote: "The Concert Programmer"
-;;   https://www.youtube.com/watch?v=yY1FSsUV-8c
-;; also used this code for a short-cutting the translation
+;; ======================================================================
+;; A work derived & inspired by Andrew Sorensen OSCON 2014 Keynote:
+;; "The Concert Programmer" coded for Overtone by Roger Allen
+;;
+;; See the original here: https://www.youtube.com/watch?v=yY1FSsUV-8c
+;;
+;; also used this code as a short-cut for the translation
 ;;   https://github.com/allenj12/jam1/blob/master/src/jam1/core.clj
+;; ======================================================================
+
+;; tempo of the piece.  used as a global def
+(def metro (metronome 110))
 
 ;; ======================================================================
-;; left hand
+;; fmsynth instrument seems close to what Andrew has, but it needs work.
+(defsynth fmsynth
+  [note 60 divisor 1.0 depth 1.0
+   attack 0.05 release 0.05 ;; envelope times
+   duration 1.0 level 1.0 out-bus 0]
+  (let [carrier   (midicps note)
+        modulator (/ carrier divisor)
+        S         (- duration attack release)
+        mod-env   (env-gen (lin attack 0 (+ S release)))
+        amp-env   (env-gen (lin attack S release) :action FREE)
+        osc1      (* mod-env (* carrier depth) (sin-osc modulator))
+        ]
+    (out out-bus (pan2 (* amp-env (sin-osc (+ carrier osc1)))))))
 
-;; tempo of the piece
-(def metro (metronome 110))
-;; I want to think in notes, not midi pitches like 52
-(def root (atom :e3))
+;; Use play for sampled-piano, play1 for fmsynth
+;; here's a fmsynth variant for the right-hand part
+;; FIXME – this insn't quite there yet
+(def fmsynth1 (partial fmsynth :attack 0.01 :release 0.1 :divisor 0.15 :depth 0.5))
+;;(fmsynth1 :note 79 :duration 0.2)
 
 (defn play
   "for synths that have :note, :level and :gate, play a note at a
@@ -23,6 +43,19 @@
   [beat synth pitch level dur]
   (let [cur-synth (at (metro beat) (synth :note pitch :level level))]
     (at (metro (+ beat dur)) (ctl cur-synth :gate 0))))
+
+(defn play1
+  "for synths that have :note, :level and :duration, play a note at a
+  certain beat & allow it to turn off after the duration in beats."
+  [beat synth pitch level dur]
+  (let [dur-s (* dur (/ (metro-tick metro) 1000))]
+    (at (metro beat) (synth :note pitch :duration dur-s :level level))))
+
+;; ======================================================================
+;; left hand
+
+;; I want to think in notes, not midi pitches like 52
+(def root (atom :e3))
 
 (defn left-hand
   "temporal recursion pattern"
@@ -37,7 +70,7 @@
     (apply-by (metro (+ beat dur))
               #'left-hand [(+ beat dur) (rotate 1 ps) (rotate 1 ds)])))
 
-(left-hand (metro) [:g3 :g3 :a3 :b3] [1])
+;;(left-hand (metro) [:g3 :g3 :a3 :b3] [1])
 ;;(left-hand (metro) [:g3 :g3 :a3 :b3] [1 0.5 1.5 1])
 ;;(stop)
 
@@ -70,67 +103,57 @@
 
 (defn right-hand
   [beat dur]
-  (at (metro beat)
-      (play beat
-            sampled-piano
-            (quantize (cosr beat (cosr beat 3 5 2) (+ (note @root) 24) 3/7) scale0)
-            (cosr beat 0.15 0.5 3/7)
-            (* 2.0 dur))
-      (apply-by (metro (+ beat dur)) #'right-hand [(+ beat dur) dur])))
+  (play beat
+        sampled-piano
+        (quantize (cosr beat (cosr beat 3 5 2) (+ (note @root) 24) 3/7) scale0)
+        (cosr beat 0.15 0.5 3/7)
+        (* 2.0 dur))
+  ;; add this 2nd
+  (if (> (rand) 0.6)
+    (play1 beat
+           fmsynth1
+           (quantize (+ 7 (cosr beat (cosr beat 3 5 2) (+ (note @root) 24) 3/7)) scale0)
+           (cosr beat 0.15 0.6 3/7)
+           (* 0.2 dur)))
+  (apply-by (metro (+ beat dur)) #'right-hand [(+ beat dur) dur]))
 
 ;;(right-hand (metro) 1/4)
 ;;(stop)
 
-;; start on 1st beat of the bar (default is 4 beats/measure)
-(left-hand (* 4 (metro-bar metro)) [:g3 :g3 :a3 :b3] [1])
-(right-hand (* 4 (metro-bar metro)) 1/4)
+;; ======================================================================
+;; bass line
+(defn bassline
+  [beat ps ds]
+  (let [dur (first ds)];)) ;; uncomment to stop
+    (play1 beat fmsynth (note @root) 0.8 (* (first ps) (first ds)))
+    (apply-by (metro (+ beat dur))
+              #'bassline [(+ beat dur) (rotate 1 ps) (rotate 1 ds)])))
 
 ;; ======================================================================
-;; CODE IN PROGRESS BELOW THIS...
-
-
-(defn hats
-  [beat dur]
-  (at (metro beat)
-      (closed-hat2 :amp 0.2 :decay (rand-nth '(0.3 0.1))))
-  (apply-by (metro (+ beat (* 0.5 dur))) hats (+ beat dur) dur []))
-
+;; kick drum
 (defn kick-drum
   [beat dur]
-  (at (metro (- beat 1/4))
-      (kick4 :freq 150 :amp 0.8 :attack 0.04 :decay dur))
-  (at (metro beat)
-      (kick4 :freq 250 :amp 0.9 :attack 0.04 :decay dur))
-  (apply-by (metro (+ beat (* 0.5 dur))) kick-drum (+ beat dur) dur []))
+  (let [f (midi->hz (- (note @root) 4))];)) ;; uncomment to stop
+    (at (metro (- beat 1/4)) (kick4 :freq f :amp 0.6 :attack 0.04 :decay dur))
+    (at (metro beat)         (kick4 :freq f :amp 0.8 :attack 0.04 :decay dur))
+    (apply-by (metro (+ beat (* 0.5 dur))) #'kick-drum [(+ beat dur) dur])))
 
+;; ======================================================================
+;; hats
+(def hat0 (partial closed-hat :low 10000 :hi 8000))
+(def hat1 (partial closed-hat2))
+(defn hats
+  [beat dur]
+  (let [hat (rand-nth [hat0 hat1])];)) ;; uncomment to stop
+    (at (metro beat) (hat) (cosr beat 0.4 0.5 (rand-nth [3/7 2/5])))
+    (apply-by (metro (+ beat dur)) #'hats [(+ beat dur) dur])))
 
-;; left hand pitches
-(def lpitches [:G3 :G3 :A3 :B3])
+;; ======================================================================
+;; start on 1st beat of the bar (default is 4 beats/measure)
+(left-hand  (* 4 (metro-bar metro)) [:g3 :g3 :a3 :b3] [1])
+(right-hand (* 4 (metro-bar metro)) 1/4)
+(bassline   (* 4 (metro-bar metro)) [0.25 0.25 0.6] [3/2 1 3/2])
+(kick-drum  (* 4 (metro-bar metro)) 1)
+(hats       (* 4 (metro-bar metro)) 1/4)
 
-(do
-  (left-hand (metro) (cycle lpitches) 1)
-  (right-hand (metro) 1/4)
-  (hats (metro) 1/4)
-  (kick-drum (metro) 1/2)
-)
-
-(stop)
-
-;; from https://github.com/overtone/overtone/blob/master/src/overtone/examples/synthesis/fm.clj
-(o/env-gen (o/adsr 1.5 1.5 0.8 1.5) :gate gate :action FREE)
-(defsynth fmsynth
-  [carrier 550 modulator 220 depth 1.0 out-bus 0]
-  (let [modulator (/ carrier divisor)
-        mod-env   (env-gen (lin 1 0 3))
-        amp-env   (env-gen (lin 1 1 2) :action FREE)]
-    (out out-bus
-         (pan2 (* 0.5 amp-env (sin-osc
-                               (+ carrier
-                                  (* mod-env (* carrier depth) (sin-osc modulator)))))))))
-
-(defsynth fmsynth
-  [carrier 550 modulator 220 depth 1.0 out-bus 0]
-  (let [o1
-
-(fmsynth 800 12 2)
 (stop)
