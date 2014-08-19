@@ -5,14 +5,25 @@
         [overtone.inst.synth]))
 ;; ======================================================================
 ;; A work derived & inspired by Andrew Sorensen OSCON 2014 Keynote:
-;; "The Concert Programmer" coded for Overtone by Roger Allen
-;;
+;;   "The Concert Programmer"
 ;; See the original here: https://www.youtube.com/watch?v=yY1FSsUV-8c
 ;;
+;; Coded for Overtone by Roger Allen
 ;; also used this code as a short-cut for the translation
 ;;   https://github.com/allenj12/jam1/blob/master/src/jam1/core.clj
+;;
+;; I highly recommend trying to do this yourself.  Use this file for
+;; hints, but code it in your own way.
 ;; ======================================================================
+(comment
+  (use 'overtone.core)
+  (connect-external-server)
+  (use 'overtone.inst.sampled-piano)
+  (use 'overtone.inst.drum)
+  (use 'overtone.inst.synth)
+)
 
+;; ======================================================================
 ;; tempo of the piece.  used as a global def
 (def metro (metronome 110))
 
@@ -27,13 +38,12 @@
         S         (- duration attack release)
         mod-env   (env-gen (lin attack 0 (+ S release)))
         amp-env   (env-gen (lin attack S release) :action FREE)
-        osc1      (* mod-env (* carrier depth) (sin-osc modulator))
-        ]
+        osc1      (* mod-env (* carrier depth) (sin-osc modulator))]
     (out out-bus (pan2 (* amp-env (sin-osc (+ carrier osc1)))))))
 
 ;; Use play for sampled-piano, play1 for fmsynth
 ;; here's a fmsynth variant for the right-hand part
-;; FIXME – this insn't quite there yet
+;; FIXME – this isn't quite there yet
 (def fmsynth1 (partial fmsynth :attack 0.01 :release 0.1 :divisor 0.15 :depth 0.5))
 ;;(fmsynth1 :note 79 :duration 0.2)
 
