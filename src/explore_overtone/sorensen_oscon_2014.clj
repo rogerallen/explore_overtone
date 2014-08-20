@@ -28,25 +28,44 @@
 (def metro (metronome 110))
 
 ;; ======================================================================
-;; fmsynth instrument seems close to what Andrew has, but it needs work.
+;; found samples via this web page
+;; http://technicae.cogitat.io/2014/07/oscon-2014-theme-song-andrew-sorensen.html
+(def salamander-path "/Users/rallen/Music/Samples/salamander/OH/") ;; !FIXME!
+(def kick1          (sample (str salamander-path "kick_OH_F_9.wav")))
+;; Not currently using these...overtone version working fine for me
+;;(def closed-hi-hat (sample (str salamander-path "hihatClosed_OH_F_20.wav")))
+;;(def pedal-hi-hat  (sample (str salamander-path "hihatFoot_OH_MP_12.wav")))
+;;(def open-hi-hat   (sample (str salamander-path "hihatOpen_OH_FF_6.wav")))
+
+;; ======================================================================
+;; fmsynth instrument translation from
+;; https://github.com/digego/extempore/blob/master/libs/core/instruments.xtm
+;; (more work could be done on the effects...I only added a delay)
 (defsynth fmsynth
-  [note 60 divisor 1.0 depth 1.0
-   attack 0.05 release 0.05 ;; envelope times
-   duration 1.0 level 1.0 out-bus 0]
-  (let [carrier   (midicps note)
-        modulator (/ carrier divisor)
-        S         (- duration attack release)
-        mod-env   (env-gen (lin attack 0 (+ S release)))
-        amp-env   (env-gen (lin attack S release) :action FREE)
-        osc1      (* mod-env (* carrier depth) (sin-osc modulator))]
-    (out out-bus (pan2 (* amp-env (sin-osc (+ carrier osc1)))))))
+  [note 60 duration 1.0 level 1.0
+   attack 0.05 release 0.05
+   I 0.1  ;; modulation index (generally 0-1, but can go higher)
+   H 10.0 ;; harmonicity ratio (whole numbers 1 - 20)
+   out-bus 0
+   ]
+  (let [freq    (midicps note)
+        o2      (* I (* H freq) (sin-osc (* H freq)))
+        o1      (* level (/ 5.0 (log freq)) (sin-osc (+ freq o2)))
+        S       (- duration attack release)
+        amp-env (env-gen (lin attack S release))
+        D       0.314
+        all-env (env-gen (lin 0.01 (+ D (* 2 S)) 0.01) :action FREE)
+        snd     (* amp-env o1)
+        dly     (* 0.5 (delay-l snd 1.0 D))
+        snd     (+ snd dly)]
+    (out out-bus (pan2 (* all-env snd)))))
+
+;;(fmsynth :note 52 :I 1.0 :H 0.5 :attack 0.01 :release 0.6)
+(def fmsynth0 (partial fmsynth :I 1.0 :H 0.5 :attack 0.1 :release 0.2))
+;;(fmsynth :note 79 :I 0.5 :H 5.0 :duration 0.2 :attack 0.05 :release 0.1)
+(def fmsynth1 (partial fmsynth :I 0.5 :H 5.0 :attack 0.01 :release 0.02))
 
 ;; Use play for sampled-piano, play1 for fmsynth
-;; here's a fmsynth variant for the right-hand part
-;; FIXME – this isn't quite there yet
-(def fmsynth1 (partial fmsynth :attack 0.01 :release 0.1 :divisor 0.15 :depth 0.5))
-;;(fmsynth1 :note 79 :duration 0.2)
-
 (defn play
   "for synths that have :note, :level and :gate, play a note at a
   certain beat & turn it off after the duration in beats."
@@ -135,7 +154,7 @@
 (defn bassline
   [beat ps ds]
   (let [dur (first ds)];)) ;; uncomment to stop
-    (play1 beat fmsynth (note @root) 0.8 (* (first ps) (first ds)))
+    (play1 beat fmsynth0 (note @root) 0.8 (* (first ps) (first ds)))
     (apply-by (metro (+ beat dur))
               #'bassline [(+ beat dur) (rotate 1 ps) (rotate 1 ds)])))
 
@@ -144,8 +163,8 @@
 (defn kick-drum
   [beat dur]
   (let [f (midi->hz (- (note @root) 4))];)) ;; uncomment to stop
-    (at (metro (- beat 1/4)) (kick4 :freq f :amp 0.6 :attack 0.04 :decay dur))
-    (at (metro beat)         (kick4 :freq f :amp 0.8 :attack 0.04 :decay dur))
+    (at (metro (- beat 1/4)) (kick1 :amp 0.6))
+    (at (metro beat)         (kick1 :amp 0.8))
     (apply-by (metro (+ beat (* 0.5 dur))) #'kick-drum [(+ beat dur) dur])))
 
 ;; ======================================================================
@@ -160,10 +179,12 @@
 
 ;; ======================================================================
 ;; start on 1st beat of the bar (default is 4 beats/measure)
-(left-hand  (* 4 (metro-bar metro)) [:g3 :g3 :a3 :b3] [1])
-(right-hand (* 4 (metro-bar metro)) 1/4)
-(bassline   (* 4 (metro-bar metro)) [0.25 0.25 0.6] [3/2 1 3/2])
-(kick-drum  (* 4 (metro-bar metro)) 1)
-(hats       (* 4 (metro-bar metro)) 1/4)
+(comment
 
-(stop)
+  (left-hand  (* 4 (metro-bar metro)) [:g3 :g3 :a3 :b3] [1])
+  (right-hand (* 4 (metro-bar metro)) 1/4)
+  (bassline   (* 4 (metro-bar metro)) [0.25 0.25 0.6] [3/2 1 3/2])
+  (kick-drum  (* 4 (metro-bar metro)) 1)
+  (hats       (* 4 (metro-bar metro)) 1/4)
+
+  (stop))
