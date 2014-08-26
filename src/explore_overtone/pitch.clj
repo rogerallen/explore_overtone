@@ -361,6 +361,9 @@
    :m11+      '(0 3 7 10 14 18)
    })
 
+;; FIXME add fn to take intervals & return chord name
+;; (fn '(0 4 7)) -> "major"
+
 (defn chord-invert
   "invert a chord.  Well behaved for 1 <= n < (count chord)."
   [chord n]
