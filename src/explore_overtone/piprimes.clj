@@ -5,10 +5,10 @@
 
 ;; ======================================================================
 ;; okay what about pi?
-(do 
+(do
   (use 'overtone.inst.piano)
   (def pi8 '(3 1 4 1 5 9 2 6))
-  (defn nth-note-of-scale 
+  (defn nth-note-of-scale
     "given a digit 'n' in range 0..9 find index in scale defined by tonic & type
      e.g
      user> (nth-note-of-scale :c4 :major 1)
@@ -33,6 +33,14 @@
 ;; ======================================================================
 ;; having constant velocity & duration sucks...
 ;; mo pi...
+
+;; Just a note for future hacking...convert pi to a non-base-10-radix
+;; user> (BigInteger. "31415926535")
+;; 31415926535
+;; user> (.toString (BigInteger. "31415926535") 5)
+;; "1003314434122120"
+;; user> (.toString (BigInteger. "31415926535") 12)
+;; "610916905b"
 
 ;; pi to 1000 digits
 (def pi1000 '(3 1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3
@@ -67,7 +75,7 @@
   7 6 6 1 1 1 9 5 9 0 9 2 1 6 4 2 0 1 9 8 9))
 
 (do
-  ;; use this to get a tuple (note velocity duration) for indexing 
+  ;; use this to get a tuple (note velocity duration) for indexing
   (defn s3v [s]
     "given a list s, make it into a list of 3-vectors"
     (map vector
@@ -178,7 +186,7 @@
 ;; ======================================================================
 ;; okay let's transform to a sequence calc & then play seq
 (do
-  ;; use this to get a tuple (note velocity duration) for indexing 
+  ;; use this to get a tuple (note velocity duration) for indexing
   (defn s3v [s]
     "given a list s, make it into a list of 3-vectors"
     (map vector
@@ -216,19 +224,19 @@
   (defn sum-beats [cur-3v nxt-3v]
     "given 2 (n v d) tuples, sum the duration to give a beat for the nxt one"
     (list (nth nxt-3v 0) (nth nxt-3v 1) (+ (nth cur-3v 2) (nth nxt-3v 2))))
-  
+
   (defn calcmopi [tonic type num-notes offset]
     "calc some pi notes in a certain key. doall to remove laziness"
     (doall (map #(iii2nvd tonic type %) (take num-notes (nthrest (s3v pi1000) offset)))))
-  
+
   (defn seqbeats [seq]
     "how long is a sequence?"
     (nth (reduce sum-beats seq) 2))
 
   (defn v34 [cur-3v]
     (list (nth cur-3v 0) (nth cur-3v 1) (nth cur-3v 2) 0 ))
-  
-  ;; duration2beat 
+
+  ;; duration2beat
   (defn d2b [cur-4v nxt-4v]
     "given 2 (n v d 0) tuples, sum the duration to give a beat for the nxt one"
     (let [ret-4v-n (nth nxt-4v 0)
@@ -265,7 +273,7 @@
 (do ; a forever song
 
   (def metro (metronome 120))
-  
+
   (defn infinite-song [m beat]
     (println "infinite song" beat)
     (def seq1 (calcmopi :e3 :pentatonic 32 (mod beat 300)))
@@ -278,11 +286,11 @@
     (apply-at (m seq2-start) #'infinite-song m seq2-start []))
 
   (infinite-song metro (metro))
-  
+
 
 ;; okay that 3v & 4v stuff has to go.  time to use structures or something.
-   
+
 (do
   (defrecord seq-note [note velocity duration]
-    
+
   )
