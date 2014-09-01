@@ -60,7 +60,8 @@
   [beat bar is vs ds pat-keys pat-bars]
   (let [dur (first ds)
         [bar pat-keys pat-bars] (adjust-bar beat bar pat-keys pat-bars)
-        _ (println "LH" bar (first pat-keys))]
+        ;;_ (println "LH" bar (first pat-keys))
+        ]
     (if (= 0.0 (mod beat 4))
       (if (= :A (first pat-keys))
         (reset! (:mode Ω) (scale->field :D :dorian))   ;; :A
