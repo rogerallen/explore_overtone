@@ -1,7 +1,7 @@
 (ns explore-overtone.midi-persi
   (:use [overtone.music.time :only [now]]
-        [overtone.libs.event :only [on-event remove-handler]])
-  (:require [persi.core :as persi]))
+        [overtone.libs.event :only [on-event remove-event-handler]])
+  (:require [persi.persi :as persi]))
 
 ;; ======================================================================
 ;; 10 seconds should be pretty decent
@@ -9,16 +9,17 @@
 
 ;; ======================================================================
 ;; echo persi api
-(def dirty? persi/dirty?)
-(def init! persi/init!)
-(def new! persi/new!)
-(def save! persi/save!)
-(def append! persi/append!)
-(def insert! persi/insert!)
 (def get-list persi/get-list)
 (def get-map persi/get-map)
 (def get-file-name persi/get-file-name)
 (def get-dir-name persi/get-dir-name)
+(def dirty? persi/dirty?)
+(def init! persi/init!)
+(def new! persi/new!)
+(def save! persi/save!)
+(def open! persi/open!)
+(def append! persi/append!)
+(def set! persi/set!)
 (def summary persi/summary)
 
 ;; ======================================================================
@@ -34,7 +35,7 @@
                  (fn [{note :note
                       velocity :velocity
                       timestamp :timestamp}]
-                   (persi/append! {:command :note-on
+                   (append! {:command :note-on
                                    :note note
                                    :velocity velocity
                                    :timestamp timestamp}))
@@ -43,7 +44,7 @@
                  (fn [{note :note
                       velocity :velocity
                       timestamp :timestamp}]
-                   (persi/append! {:command :note-off
+                   (append! {:command :note-off
                                    :note note
                                    :velocity velocity
                                    :timestamp timestamp}))
@@ -52,8 +53,8 @@
 (defn pause
   "Pause recording note on/off events to the midipe-events list"
   []
-  (remove-handler [::midipe :midi :note-on])
-  (remove-handler [::midipe :midi :note-off]))
+  (remove-event-handler [::midipe :midi :note-on])
+  (remove-event-handler [::midipe :midi :note-off]))
 
 ;; ======================================================================
 ;; manipulating events
@@ -89,3 +90,23 @@
   (partition-at-true
    #(> (:timestamp-̣Δ %) partition-threshold)
    (events-timestamp-Δ the-list)))
+
+(defn make-notes
+  [event-list0]
+  (let [ft (:timestamp (first event-list0))]
+    (loop [event-list event-list0 first-timestamp ft notes []]
+      (let [event-list (drop-while #(= (:command %) :note-off) event-list)
+            cur-note-on (first event-list)
+            event-list (rest event-list)
+            cur-note-off (first (drop-while #(or (= (:command %) :note-on)
+                                                 (not= (:note %) (:note cur-note-on))) event-list))]
+        (if (not (nil? cur-note-on))
+          (let [cur-note {:command   :note
+                          :note      (:note cur-note-on)
+                          :velocity  (:velocity cur-note-on)
+                          :timestamp (/ (- (:timestamp cur-note-on) first-timestamp) 1000.0)
+                          :duration  (/ (- (:timestamp cur-note-off) (:timestamp cur-note-on)) 1000.0)}
+                notes (conj notes cur-note)]
+            (recur event-list first-timestamp notes))
+          ;; else
+          notes)))))
