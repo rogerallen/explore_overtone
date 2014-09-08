@@ -1,7 +1,8 @@
 (ns explore-overtone.midi-persi
   (:use [overtone.music.time :only [now]]
         [overtone.libs.event :only [on-event remove-event-handler]])
-  (:require [persi.persi :as persi]))
+  (:require [persi.persi :as persi]
+            [quil.core :as q]))
 
 ;; ======================================================================
 ;; 10 seconds should be pretty decent
@@ -83,6 +84,8 @@
 ;; FIXME?  Do I need to worry about note-on ... note-off pairs that go
 ;;   over threshold?  idea--count note-on as +, note-off as -.  Don't
 ;;   end unless sum is 0.
+
+;; FIXME make a version that takes a partition-threshold
 (defn partition-by-timestamp
   "create a lazy seq of event seqs partitioned when timestamp goes
   over a threshold."
@@ -92,21 +95,77 @@
    (events-timestamp-Δ the-list)))
 
 (defn make-notes
+  "convert a sequence of events into a sequence of notes with
+  duration.  Also changes timestamps from microseconds to milliseconds."
   [event-list0]
-  (let [ft (:timestamp (first event-list0))]
+  (let [ft (:timestamp (first (drop-while #(not= (:command %) :note-on) event-list0)))]
     (loop [event-list event-list0 first-timestamp ft notes []]
-      (let [event-list (drop-while #(= (:command %) :note-off) event-list)
-            cur-note-on (first event-list)
-            event-list (rest event-list)
-            cur-note-off (first (drop-while #(or (= (:command %) :note-on)
-                                                 (not= (:note %) (:note cur-note-on))) event-list))]
+      (let [event-list   (drop-while #(not= (:command %) :note-on) event-list)
+            cur-note-on  (first event-list)
+            event-list   (rest event-list)
+            cur-note-off (first
+                          (drop-while
+                           #(or (= (:command %) :note-on)
+                                (not= (:note %) (:note cur-note-on))) event-list))]
         (if (not (nil? cur-note-on))
-          (let [cur-note {:command   :note
+          (let [;;_ (println cur-note-on "\n" cur-note-off "\n")
+                cur-note {:command   :note
                           :note      (:note cur-note-on)
                           :velocity  (:velocity cur-note-on)
-                          :timestamp (/ (- (:timestamp cur-note-on) first-timestamp) 1000.0)
-                          :duration  (/ (- (:timestamp cur-note-off) (:timestamp cur-note-on)) 1000.0)}
+                          :timestamp (/ (- (:timestamp cur-note-on) first-timestamp)
+                                        1000.0)
+                          :duration  (/ (- (:timestamp cur-note-off)
+                                           (:timestamp cur-note-on))
+                                        1000.0)}
                 notes (conj notes cur-note)]
             (recur event-list first-timestamp notes))
-          ;; else
           notes)))))
+
+(defonce record-keyboard-keycount (atom 0))
+
+(defn- record-keyboard-setup
+  []
+  (reset! record-keyboard-keycount 0)
+  (q/background 255))
+
+(defn- record-keyboard-draw
+  []
+  (if (> @record-keyboard-keycount 0)
+    (q/background 128)
+    (q/background 255)))
+
+(defn- record-keyboard-key-pressed
+  []
+  (swap! record-keyboard-keycount inc)
+  (append! {:command   :key-pressed
+            :keycode   (q/key-code)
+            :timestamp (* 1000 (now))}))
+
+(defn- record-keyboard-key-released
+  []
+  (swap! record-keyboard-keycount dec)
+  (append! {:command   :key-released
+            :keycode   (q/key-code)
+            :timestamp (* 1000 (now))}))
+
+(defn record-keyboard-events
+  "bring up quil window that allows for recording keyboard events"
+  []
+  (q/defsketch keyboard-sketch
+    :title        "midi-persi-keys"
+    :setup        record-keyboard-setup
+    :draw         record-keyboard-draw
+    :key-pressed  record-keyboard-key-pressed
+    :key-released record-keyboard-key-released
+    :size         [200 200]))
+
+(defn keyboard-tempo
+  "look at the last partition's keyboard events and return the bpm"
+  []
+  (let [timestamp-̣Δs (map :timestamp-̣Δ
+                          (filter #(= (:command %) :key-pressed)
+                                  (rest (last (partition-by-timestamp (get-list))))))
+        sum (apply + timestamp-̣Δs)
+        ave-spb (/ (/ sum (count timestamp-̣Δs)) 1000000.0)
+        ave-tempo (* 60.0 (/ ave-spb))]
+    ave-tempo))

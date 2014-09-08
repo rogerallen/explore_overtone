@@ -2,8 +2,7 @@
   (:require [overtone.live :as o]
             [overtone.synth.stringed :as oss]
             [overtone.inst.synth :as osynth]
-            [oversampler.piano.inst :as piano]
-            [oversampler.cello.inst :as cello]
+            [overtone.inst.sampled-piano :as piano]
             [explore-overtone.midi-persi :as mp]))
 
 (defn play-piano
@@ -16,6 +15,16 @@
   (let [s (o/at t (oss/ektara note 1))]
     (o/at (+ t dur) (o/ctl s :gate 0))))
 
+(defn play-overpad
+  [t note dur]
+  (let [s (o/at t (osynth/overpad note))]
+    (o/at (+ t dur) (o/ctl s :gate 0))))
+
+(def snap (o/sample (o/freesound-path 87731)))
+(defn play-snap
+  [t]
+  (snap))
+
 (defn seq-synth
   [synth t0 notes]
   (when-not (empty? notes)
@@ -25,6 +34,17 @@
     (when-not (empty? (rest notes))
       (o/apply-by (+ t0 (:timestamp (first (rest notes))))
                   #'seq-synth [synth t0 (rest notes)]))))
+
+(defonce do-click (atom false))
+(defn click-track
+  ([tempo]
+     (reset! do-click true)
+     (click-track (o/now) tempo))
+  ([t tempo]
+     (let [Δt (* 1000 (/ 60.0 tempo))]
+       (play-snap t)
+       (when @do-click
+         (o/apply-by (+ t Δt) #'click-track [(+ t Δt) tempo])))))
 
 (comment
 
@@ -38,6 +58,12 @@
   (mp/save!)  ;; to save work away
   (mp/open! "140907_145403.clj")
 
+  ;; find a tempo
+  (mp/record-keyboard-events) ;; find tiny pop-under window in center of screen
+  (mp/keyboard-tempo)
+  (click-track 80)
+  (reset! do-click false)
+
   ;; connect a synth to the midi player
   (def mpp (o/midi-poly-player (partial oss/ektara :gate 1)))
   (def mpp (o/midi-poly-player (partial piano/sampled-piano
@@ -47,10 +73,12 @@
   ;; partition into sequences & play each
   (def nl (mp/partition-by-timestamp (mp/get-list)))
   (count nl)
-  (seq-synth play-piano (o/now) (mp/make-notes (last nl)))
-  (seq-synth play-ektara (o/now) (mp/make-notes (nth nl 0)))
+  (do
+    (seq-synth play-piano (o/now) (mp/make-notes (last nl)))
+    (seq-synth play-piano (o/now) (mp/make-notes (nth nl 4))))
 
   ;; FIXME
-  ;; add a way to loop a sequence
+  ;; o add a way to loop a sequence
+  ;; o add keyboard controls for splitting a sequence
 
 )
