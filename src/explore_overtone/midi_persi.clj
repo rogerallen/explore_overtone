@@ -6,7 +6,7 @@
 
 ;; ======================================================================
 ;; 10 seconds should be pretty decent
-(def partition-threshold 10000000)
+(def default-partition-threshold 10000000)
 
 ;; ======================================================================
 ;; echo persi api
@@ -84,19 +84,26 @@
 ;; FIXME?  Do I need to worry about note-on ... note-off pairs that go
 ;;   over threshold?  idea--count note-on as +, note-off as -.  Don't
 ;;   end unless sum is 0.
-
-;; FIXME make a version that takes a partition-threshold
 (defn partition-by-timestamp
   "create a lazy seq of event seqs partitioned when timestamp goes
-  over a threshold."
-  [the-list]
-  (partition-at-true
-   #(> (:timestamp-̣Δ %) partition-threshold)
-   (events-timestamp-Δ the-list)))
+  over a threshold.  timestamp is in µs."
+  ([the-list]
+     (partition-by-timestamp default-partition-threshold the-list))
+  ([partition-threshold the-list]
+     (partition-at-true
+      #(> (Math/abs (:timestamp-̣Δ %)) partition-threshold)
+      (events-timestamp-Δ the-list))))
+
+(defn repartition-by-keys ;; -vs-notes FIXME results in 1 layer too many
+  [the-partitioned-list]
+  (map (fn [a-list] (partition-by #(or (= (:command %) :key-pressed)
+                                      (= (:command %) :key-released)) a-list))
+       the-partitioned-list))
 
 (defn make-notes
   "convert a sequence of events into a sequence of notes with
-  duration.  Also changes timestamps from microseconds to milliseconds."
+  duration.  NOTE! time is now 0 at the start of the sequence and this
+  changes timestamps from µs to ms."
   [event-list0]
   (let [ft (:timestamp (first (drop-while #(not= (:command %) :note-on) event-list0)))]
     (loop [event-list event-list0 first-timestamp ft notes []]
@@ -121,6 +128,12 @@
             (recur event-list first-timestamp notes))
           notes)))))
 
+;; ======================================================================
+;; keyboard events via a Quil window.  Had to do this because
+;; interacting with unbuffered keybaord events inside emacs is
+;; difficult/impossible.
+;;
+
 (defonce record-keyboard-keycount (atom 0))
 
 (defn- record-keyboard-setup
@@ -129,12 +142,14 @@
   (q/background 255))
 
 (defn- record-keyboard-draw
+  "draws grey when a key is down"
   []
   (if (> @record-keyboard-keycount 0)
     (q/background 128)
     (q/background 255)))
 
 (defn- record-keyboard-key-pressed
+  "records the keycode and time in µs"
   []
   (swap! record-keyboard-keycount inc)
   (append! {:command   :key-pressed
@@ -142,6 +157,7 @@
             :timestamp (* 1000 (now))}))
 
 (defn- record-keyboard-key-released
+  "records the keycode and time in µs"
   []
   (swap! record-keyboard-keycount dec)
   (append! {:command   :key-released
@@ -157,10 +173,12 @@
     :draw         record-keyboard-draw
     :key-pressed  record-keyboard-key-pressed
     :key-released record-keyboard-key-released
-    :size         [200 200]))
+    :size         [128 128]
+    :features     [:keep-on-top]))
 
 (defn keyboard-tempo
-  "look at the last partition's keyboard events and return the bpm"
+  "look at the last partition's keyboard events and return the bpm.
+  Timestamp expected in µs."
   []
   (let [timestamp-̣Δs (map :timestamp-̣Δ
                           (filter #(= (:command %) :key-pressed)
