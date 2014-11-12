@@ -5,7 +5,7 @@
         [overtone.synth.stringed]))
 
 ;; globals
-(def Ω {:metro (metronome 144)
+(def Ω {:metro (metronome 134)
         :mode (atom (scale->field :D :dorian))})
 
 (defn play
@@ -37,6 +37,39 @@
         pitches (map #(deg->pitch field (+ deg %)) intervals)]
     pitches))
 
+;; swing rhythm
+(defn linear-map
+  "given x0 -> y0.  x1 -> y1.  x maps linearly to y"
+  [x0 x1 y0 y1 x]
+  (let [dydx (/ (- y1 y0) (- x1 x0))
+        dx (- x x0)]
+    (+ y0 (* dydx dx))))
+
+;; eigth/eight -> dotted-eigth/sixteenth: (swing-time 3/4 1 t)
+(defn swing-time
+  "swing a time"
+  [first-dur swing-dur t]
+  (let [i (int t)
+        f (mod t swing-dur)
+        h (/ swing-dur 2)]
+    (if (<= f h)
+      (+ i (linear-map 0 h         0         first-dur f))
+      (+ i (linear-map h swing-dur first-dur swing-dur f)))))
+
+(defn swing-dur
+  "swing a duration, starting at t"
+  [first-dur swing-dur t dur]
+  (let [t0 (swing-time first-dur swing-dur t)
+        t1 (swing-time first-dur swing-dur (+ t dur))]
+    (- t1 t0)))
+
+;; actually went into audacity to see what they were doing
+;; samples: (7744 11680) (7136 12512) (7328 12864) (5696 14080)
+;; 19760.0 samples per beat = 134 bpm
+;; 0.36-0.39 for first beat.  smallest is at most .288
+(def this-swing-time (partial swing-time 5/8 1))
+(def this-swing-dur (partial swing-dur 5/8 1))
+
 ;; 32-bar AABA song form and were in D Dorian for the A sections and
 ;; modulated a half step up to E-flat Dorian for the B section.
 ;; beat/4 = bar.  8 bars/section = 32 beats/section.  32*4=128 beats/AABA
@@ -64,50 +97,38 @@
         ]
     (if (= 0.0 (mod beat 4))
       (if (= :A (first pat-keys))
-        (reset! (:mode Ω) (scale->field :D :dorian))   ;; :A
+        (reset! (:mode Ω) (scale->field :D  :dorian))   ;; :A
         (reset! (:mode Ω) (scale->field :D# :dorian)))) ;; :B
-    (if (nil? (first is))
-      (apply-by ((:metro Ω) (+ beat dur))
-                #'left-hand [(+ beat dur) bar (rotate 1 is) (rotate 1 vs) (rotate 1 ds)
-                             pat-keys pat-bars])
-      ;; see below for harmonize derivation
+    (when-not (nil? (first is))
+      ;; Chord by Bill Evans!  A combination of quartal harmony and
+      ;; tertiary harmony in D Dorian mode. (Quartal means chords built in 4th
+      ;; intervals. Tertiary means chords built in 3rds.)
+      ;; "D2" "E2" "F2" "G2" "A2" "B2" "C3" "D3" "E3" "F3" "G3" "A3" "B3" "C4" "D4"
+      ;;       ^              ^              ^              ^         ^
+      ;;  ^              ^              ^              ^         ^
       (let [ps (harmonize [3 3 3 2] @(:mode Ω) (first is))]
-        (dorun (doseq [p ps] (play beat sampled-piano p (first vs) dur)))
-        (apply-by ((:metro Ω) (+ beat dur))
-                  #'left-hand [(+ beat dur) bar (rotate 1 is) (rotate 1 vs) (rotate 1 ds)
-                               pat-keys pat-bars])))))
+        (dorun (doseq [p ps] (play beat sampled-piano p (first vs) dur)))))
+    (apply-by ((:metro Ω) (+ beat dur))
+              #'left-hand [(+ beat dur) bar (rotate 1 is) (rotate 1 vs) (rotate 1 ds)
+                           pat-keys pat-bars])))
 
 (defn bass
   [beat ps vs ds]
-  (let [dur (first ds)]
-    (if (nil? (first ps))
-      (apply-by ((:metro Ω) (+ beat dur))
-                #'bass [(+ beat dur) (rotate 1 ps) (rotate 1 vs) (rotate 1 ds)])
-      (do
-        ;;(println "bass" beat)
-        (play beat sampled-piano (pitchv (first ps)) (first vs) dur)
-        (apply-by ((:metro Ω) (+ beat dur))
-                  #'bass [(+ beat dur) (rotate 1 ps) (rotate 1 vs) (rotate 1 ds)])))))
-
+  (let [dur        (first ds)
+        swing-beat (this-swing-time beat)
+        swing-beat (+ swing-beat (/ (- (rand) 0.5) 10)) ;; humanize +/- .05
+        swing-dur  (this-swing-dur beat dur)
+        next-beat  (min (+ beat dur -0.05) (+ swing-beat swing-dur))]
+    (when-not (nil? (first ps))
+      (play swing-beat sampled-piano (pitchv (first ps)) (first vs) swing-dur))
+    (apply-by ((:metro Ω) next-beat)
+              #'bass [(+ beat dur) (rotate 1 ps) (rotate 1 vs) (rotate 1 ds)])))
 
 (defn next-measure []
   (* 4 (metro-bar (:metro Ω))))
 
 (comment
-  ;; Chord by Bill Evans!  These are a combination of quartal harmony and
-  ;; tertiary harmony. (Quartal means chords built in 4th
-  ;; intervals. Tertiary means chords built in 3rds.)
-  ;;
-  ;; written in D dorian
-  ;; "D2" "E2" "F2" "G2" "A2" "B2" "C3" "D3" "E3" "F3" "G3" "A3" "B3" "C4" "D4"
-  ;;       ^              ^              ^              ^         ^
-  ;;  ^              ^              ^              ^         ^
-  ;; then in Eb dorian
-  ;; "D#2" "F2" "F#2" "G#2" "A#2" "C3" "C#3" "D#3" "F3" "F#3" "G#3" "A#3" "C4" "C#4" "D#4"
-  ;;        ^                ^                ^                ^           ^
-  ;;  ^                ^                ^                ^           ^
   ;; See the sheet music animated.
-  ;;
   ;; https://www.youtube.com/watch?v=Rhv8iOY08TY
 
   (do
@@ -122,12 +143,15 @@
            nil 7r30 7r34 7r35 7r36 7r40 7r41 7r36 7r40 7r34 nil
            nil 7r30 7r34 7r35 7r36 7r40 7r41 7r36 7r40 nil
            nil 7r41 7r41 7r41 7r40 7r34 nil]
-          [0.8]
-          ;; FIXME -- does not swing nearly enough
-          [3/4 1/4 3/4 1/4 3/4 1/4 3/4 1/4 2 2
-           3/4 1/4 3/4 1/4 3/4 1/4 3/4 1/4 3/4 5/4 2
-           3/4 1/4 3/4 1/4 3/4 1/4 3/4 1/4 2 2
-           3/4 7/4 3/4 5/4  5/4 1/4 2]))
+          [0.1 0.6  0.7  0.3  0.4  0.5  0.6  0.5  0.4  0.1
+           0.1 0.6  0.7  0.3  0.4  0.5  0.6  0.5  0.4  0.6  0.1
+           0.1 0.6  0.7  0.3  0.4  0.5  0.6  0.5  0.4  0.1
+           0.1 0.7  0.7  0.7  0.5  0.6  0.1]
+          [1/2 1/2 1/2 1/2 1/2 1/2 1/2 1/2 2 2
+           1/2 1/2 1/2 1/2 1/2 1/2 1/2 1/2 1/2 3/2 2
+           1/2 1/2 1/2 1/2 1/2 1/2 1/2 1/2 2 2
+           1/2 3/2 1   1   3/2 1/2 2]))
+
   (stop)
 
 )

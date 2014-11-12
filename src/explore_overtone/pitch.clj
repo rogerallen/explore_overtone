@@ -290,7 +290,7 @@
 ;; chords (not finished)
 (defn deg->chord
   "basic chord function.  Given a scale-field and degree, return the
-  notes of a chord.  num gives monad, dyad, triad, tetrad, etc,
+  pitches of a chord.  num gives monad, dyad, triad, tetrad, etc,
   correlating to chords 5th, 7th, 9th, 11th, etc."
   [num field deg]
   (let [ds (map #(+ deg (* 2 %)) (range num))
@@ -360,6 +360,11 @@
    :11+       '(0 4 7 10 14 18)
    :m11+      '(0 3 7 10 14 18)
    })
+
+(defn intervals->chord
+  "return chord pitches given a tonic name and interval sequence."
+  [tonic intervals]
+  (map #(pitch->key (+ (name->pitch tonic) %)) intervals))
 
 ;; FIXME add fn to take intervals & return chord name
 ;; (fn '(0 4 7)) -> "major"
@@ -436,5 +441,12 @@
           start-deg (first the-chord)
           alt-chord (map #(- % start-deg) the-chord)]
       (println i the-chord alt-chord)))
+  ;; 0 (0 4 7) (0 4 7) = major
+  ;; 1 (2 5 9) (0 3 7) = minor
+  ;; 2 (4 7 11) (0 3 7) = minor
+  ;; 3 (5 9 12) (0 4 7) = major
+  ;; 4 (7 11 14) (0 4 7) = major
+  ;; 5 (9 12 16) (0 3 7) = major
+  ;; 6 (11 14 17) (0 3 6) = dim
 
   )
