@@ -1,6 +1,7 @@
 (ns explore-overtone.leipstrum
   (:use
     leipzig.melody
+    leipzig.live
     leipzig.scale
     leipzig.canon)
   (:require [overtone.live :as o]
@@ -20,11 +21,11 @@
        (phrase [2/3 1/3 2/3 1/3 6/3]
                [ :C  :C  :G  :F  :G]))
     (then
-       (phrase (repeat 12 1/3) 
+       (phrase (repeat 12 1/3)
                (mapcat (partial repeat 3)
                        [:C :F :C :G])))
     (then
-       (phrase [2/3 1/3 2/3 1/3 6/3] 
+       (phrase [2/3 1/3 2/3 1/3 6/3]
                [ :G  :G  :G  :F  :C]))
     (where :part (is :leader))))
 
@@ -33,6 +34,11 @@
     (times 2)
     (where :time speed)
     play))
+
+;; play a few chords...
+(comment
+  (strum-melody (bpm 100))
+)
 
 ;; let's rock ========================================
 ;; http://tabs.ultimate-guitar.com/a/ac_dc/highway_to_hell_ver4_tab.htm
@@ -72,6 +78,7 @@
      (phrase [0.5 0.5 0.5 0.5]
              [ 2   2   3   0 ])
      (times 2)))))
+
 (def h2h-intro
   (->>
    h2h-common
@@ -111,7 +118,7 @@
     (phrase [0.5 0.5 0.5 2.5]
             [ 0   4   4   5 ]))
    (where :part (is :h2h-lead))))
-   
+
 (defn strum-h2h [speed]
   (->>
    (->> h2h-intro
@@ -122,16 +129,18 @@
     h2h-pre-chorus2)
    ;; gives some time for clojure to compile?
    ;; otherwise first pair of notes are not well timed.
-   (after 2) 
+   (after 2)
    (where :time speed)
    play))
 
 (comment
-  (strum-melody (bpm 100))
   ;; plug in the amp...
   (o/ctl lead-guitar
          :pre-amp 5.0 :distort 0.96
          :lp-freq 5000 :lp-rq 0.25
          :rvb-mix 0.5 :rvb-room 0.7 :rvb-damp 0.4)
+
   (strum-h2h (bpm 103))
+
+  ;; be honest, did you expect that from a synth?
 )
