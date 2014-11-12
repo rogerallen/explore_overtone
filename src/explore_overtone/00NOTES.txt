@@ -1,0 +1,37 @@
+Beatles analysis
+http://www.icce.rug.nl/~soundscapes/DATABASES/AWP/awp-beatles_projects.shtml
+
+Nice list of guitar effects & sounds here
+http://phospheneproductions.blogspot.com/2013/07/guitar-effects-pedals-part-two-effects.html
+
+Whoah, how did I not see this? IXI Tutorial & Notes
+http://ecmc.rochester.edu/ecmc/docs/supercollider/scbook/Ch21_Interface_Investigations/ixi%20SC%20tutorial/
+http://www.ixi-audio.net/content/body_backyard_tutorials.html
+
+Jazz fake book
+http://books.google.com/books?vid=ISBN0788174606&id=vlP2sv6GuJIC&pg=PP17&lpg=PP17&dq=jazz&as_brr=1&sig=btWRRcE0yVxKxy00k3etaMrMSmI#v=onepage&q&f=false
+
+Markov chain overtone example
+https://gist.github.com/aaron-santos/3651346
+
+Notes and Aural & Temporal Spaces
+
+quasi-pitch?
+  - C (frequencyless?)
+    - tonic,scale,index - C,major,0
+
+pitch
+  - frequency (Hz)
+    - midi-pitch (floating-point)
+      - midi-pitch-index C4 (integer)
+        - tonic,scale,index - C4,major,0
+time (+ durations)
+  - real-time (s) = relative to some system time
+    - sequence-time (s) = relative to start of sequence
+      - sequence-beat = tempo() + beat-index, relative to start of sequence
+
+notes on the 6581 SID Audio Chip
+
+ http://en.wikipedia.org/wiki/MOS_Technology_SID
+ http://www.ffd2.com/fridge/blahtune/SID.primer
+ http://archive.6502.org/datasheets/mos_6581_sid.pdf
