@@ -8,6 +8,9 @@
 /checkouts
 /.lein-deps-sum
 /.lein-plugins
+/.lein-repl-history
 \#*#
 /audio
 /target
+/persi_files
+/*.wav
