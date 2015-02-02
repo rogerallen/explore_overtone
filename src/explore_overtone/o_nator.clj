@@ -1,5 +1,6 @@
 (ns explore-overtone.o-nator
   (:require [overtone.live :as o]
+            [overtone.libs.event :as e]
             [overtone.inst.sampled-piano :as piano]))
 
 (defn quantize
@@ -34,16 +35,58 @@
   [tonic scale note]
   (nth (o/scale-field tonic scale) (note-to-cmaj-index note)))
 
-;; a global atom to hold the current key
-(defonce Ω (atom {:tonic :d :scale :minor}))
+;; ======================================================================
+;; a global atom to hold the current key, etc
+(defonce Ω (atom {:tonic   :d
+                  :scale   :minor
+                  :dest    (o/midi-find-connected-receiver "Reaper")
+                  ;;(map o/midi-full-device-key (o/midi-connected-devices))
+                  :src     [:midi-device "KORG INC." "KEYBOARD" "nanoKEY2 KEYBOARD" 0]
+                  :channel 0}))
 
 (defn pian-o-nator
-  "For use with midi-poly-player.  Wrap sampled-piano to convert
+  "For use with midi-poly-player.  Wrap sampled-piano synth to convert
   'white keys' to the scale defined in the atom Ω.  returns the
   sampled-piano synth."
   [& {:keys [note amp velocity]}]
   (piano/sampled-piano :note  (o-nator (:tonic @Ω) (:scale @Ω) note)
                        :level amp))
+
+(defn midi-o-nator
+  "Read midi inputs from device-key, convert 'white keys' to the scale
+  defined in the atom Ω. and send them out to the device & channel in
+  the atom Ω."
+  ([] (midi-o-nator (:src @Ω)))
+  ([device-key]
+   (let [_ (println "dk" device-key)
+         on-event-key  (concat device-key [:note-on])
+         off-event-key (concat device-key [:note-off])
+         on-key        (concat [::midi-o-nator] on-event-key)
+         off-key       (concat [::midi-o-nator] off-event-key)]
+     (e/on-event on-event-key
+                 (fn [{note :note velocity :velocity}]
+                   (o/midi-note-on (:dest @Ω)
+                                 (o-nator (:tonic @Ω) (:scale @Ω) note)
+                                 velocity
+                                 (:channel @Ω)))
+                 on-key)
+     (e/on-event off-event-key
+                 (fn [{note :note}]
+                   (o/midi-note-off (:dest @Ω)
+                                    (o-nator (:tonic @Ω) (:scale @Ω) note)
+                                    (:channel @Ω)))
+                 off-key))))
+
+(defn midi-o-nator-off
+  "Pause recording note on/off events to the midi-o-nator-events list"
+  ([] (midi-o-nator-off (:src @Ω)))
+  ([device-key]
+   (let [on-event-key  (concat device-key [:note-on])
+         off-event-key (concat device-key [:note-off])
+         on-key        (concat [::midi-o-nator] on-event-key)
+         off-key       (concat [::midi-o-nator] off-event-key)]
+     (e/remove-event-handler on-key)
+     (e/remove-event-handler off-key))))
 
 (comment
   ;; cmaj = ... 60 62 64 65 67 ...
@@ -63,9 +106,16 @@
     (piano/sampled-piano (o-nator :d :minor 67)))
 
   ;; play with midi
-  (def mpp (o/midi-poly-player pian-o-nator))
+  (o/midi-poly-player pian-o-nator)
   (swap! Ω assoc :scale :dorian)
   (swap! Ω assoc :tonic :f)
   (swap! Ω assoc :scale :mixolydian)
   (o/midi-player-stop)
+
+  ;; play with midi-to-midi
+  (midi-o-nator)
+  (swap! Ω assoc :scale :pentatonic)
+  (swap! Ω assoc :tonic :e)
+  (swap! Ω assoc :scale :phrygian)
+  (midi-o-nator-off)
 )
