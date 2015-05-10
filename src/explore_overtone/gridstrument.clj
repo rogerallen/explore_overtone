@@ -1,93 +1,89 @@
 (ns explore-overtone.gridstrument
-  (:use [overtone.live]))
-;;(in-ns 'explore-overtone.gridstrument)
+  (:use overtone.live
+        overtone.synth.stringed))
 
-(def grid (midi-find-connected-device "MIDIHub Port 1"))
-(def grid-device-key (midi-full-device-key grid))
+;; ======================================================================
+;; A marriage of GridStrument and Overtone and the guitar synth
+;; See https://github.com/rogerallen/GridStrument
+;; ======================================================================
+(def server (osc-server 8675 "gridstrument"))
+;; (osc-close server)
 
-;;(event-debug-on)
-;;(event-debug-off)
+(gen-stringed-synth pektara 1 false) ;; persistent ektara
 
-(def notes* (atom [-1 -1 -1 -1
-                   -1 -1 -1 -1
-                   -1 -1 -1 -1
-                   -1 -1 -1 -1]))
+(def pitch-bend-range 10) ;; keep in sync with GridStrument
 
-(defn grid-note-on [e]
-  (let [{:keys [channel note velocity-f timestamp]} e]
-    (println timestamp "note-on" channel note velocity-f)
-    (swap! notes* (fn [x]
-                    (if (= (nth x channel) -1)
-                      (assoc x channel note)
-                      (do
-                        (println "ERROR: channel " channel " already playing a note " note)
-                        x))))))
+;; six fingers should be good enough.
+(def eks [(pektara) (pektara) (pektara) (pektara) (pektara) (pektara)])
+(def eks-notes [(atom 0) (atom 0) (atom 0) (atom 0) (atom 0) (atom 0)])
 
-(defn grid-note-off [e]
-  (let [{:keys [note channel timestamp]} e]
-    (println timestamp "note-off" channel note)
-    (swap! notes* (fn [x]
-                    (if (= (nth x channel) note)
-                      (assoc x channel -1)
-                      (do
-                        (println "ERROR: channel " channel " not playing note " note)
-                        x))))))
+;; adjust the eks sound to whatever suits you
+(dorun (map
+        #(ctl %
+              :pre-amp 5.0
+              :lp-freq 3000 :lp-rq 0.25
+              :rvb-mix 0.3 :rvb-room 0.7 :rvb-damp 0.4)
+        eks))
 
-(defn grid-pitch-bend [e]
-  (let [{:keys [channel data1 data2 timestamp]} e]
-    (println timestamp "pitch-bend" channel data1 data2)
-    (if (= (nth @notes* channel) -1)
-      (if (not (and (= data1 0) (= data2 64)))
-        (println "ERROR: channel " channel " not playing note.")))))
+;; translate GridStrument into awesomeness!
+(defn grid-note
+  [channel note value]
+  ;;(println "note" channel note value)
+  (if (= value 0)
+    (do
+      (reset! (nth eks-notes channel) 0)
+      (ctl (nth eks channel) :gate 0))
+    (do
+      (reset! (nth eks-notes channel) note)
+      (ctl (nth eks channel) :note note :gate 1))))
 
-(defn grid-control-change [e]
-  (let [{:keys [channel data1 data2 timestamp]} e]
-    (println timestamp "control-change" channel data1 data2)
-    (if (= (nth @notes* channel) -1)
-      (if (not (= data2 0))
-        (println "ERROR: channel " channel " not playing note.")))))
+(defn grid-cc
+  [channel note value]
+  (let [norm-value (/ value 127.0)
+        norm-value (* norm-value 0.9)] ;; don't allow 1.0 distortion
+    ;;(println "cc" channel note value norm-value)
+    (ctl (nth eks channel) :distort norm-value)))
 
-(do
-  (on-event [:midi :note-on] grid-note-on ::grid-note-on-handler)
-  (on-event [:midi :note-off] grid-note-off ::grid-note-off-handler)
-  (on-event [:midi :pitch-bend] grid-pitch-bend ::grid-pitch-bend-handler)
-  (on-event [:midi :control-change] grid-control-change ::grid-control-change-handler))
+(defn grid-pitch-bend
+  [channel value]
+  (let [norm-value (/ (- value 8192.0) 8192.0)
+        offset (* norm-value pitch-bend-range)
+        note (+ @(nth eks-notes channel) offset)]
+    ;;(println "pitch" channel value norm-value)
+    (ctl (nth eks channel) :note note)))
 
-(do
-  (remove-event-handler ::grid-note-on-handler)
-  (remove-event-handler ::grid-note-off-handler)
-  (remove-event-handler ::grid-pitch-bend-handler)
-  (remove-event-handler ::grid-control-change-handler))
+;; not seeing this change much yet
+(defn grid-pressure
+  [channel value]
+  (let [norm-value (/ value 4095.0)]
+    (println "pressure" channel value norm-value)))
 
-;; Testing results 4/26/2015
-;;
-;; errors appear to come from missing note-on events.
-;; if you quickly tap 2 fingers, I see events on the server for the sendNoteOn calls
-;; but only 1 note-on message appears on the client.
-;; appears related to the timing of the noteOn events on the server.  If they are
-;; within 0.001s, it gets dropped. Example:
-;;
-;; **SERVER**
-;; 04-26 10:24:27.163  30112-30112/com.gmail.rallen.gridstrument D/sendNoteOn﹕ ch=0
-;; 04-26 10:24:27.164  30112-30112/com.gmail.rallen.gridstrument D/sendNoteOn﹕ ch=1
-;; 04-26 10:24:27.240  30112-30112/com.gmail.rallen.gridstrument D/sendNoteOff﹕ ch=1
-;; 04-26 10:24:27.267  30112-30112/com.gmail.rallen.gridstrument D/sendNoteOff﹕ ch=0
-;;
-;; **CLIENT**
-;; 359922598751 note-on 0 69 0.496063
-;;   <missing note-on 1 67>
-;; 359922679854 note-off 1 67
-;; ERROR: channel  1  not playing note  67
-;; 359922692396 note-off 0 69
+(defn grid-unknown
+  [msg]
+  (println "???" msg))
+
+(defn listen [msg]
+  (let [path        (:path msg)
+        value       (first (:args msg))
+        is-note     (re-matches #"/vkb_midi/(.*)/note/(.*)" (:path msg))
+        is-cc       (re-matches #"/vkb_midi/(.*)/cc/(.*)" (:path msg))
+        is-pitch    (re-matches #"/vkb_midi/(.*)/pitch" (:path msg))
+        is-pressure (re-matches #"/vkb_midi/(.*)/channelpressure" (:path msg))]
+    (if is-note (grid-note (Integer/parseInt (nth is-note 1))
+                           (Integer/parseInt (nth is-note 2)) value)
+        (if is-cc (grid-cc (Integer/parseInt (nth is-cc 1))
+                           (Integer/parseInt (nth is-cc 2)) value)
+            (if is-pitch (grid-pitch-bend (Integer/parseInt (nth is-pitch 1)) value)
+                (if is-pressure (grid-pressure (Integer/parseInt (nth is-pressure 1)) value)
+                    (grid-unknown msg)))))))
+(osc-listen server listen :gridstrument)
+;;(osc-rm-listener server :gridstrument)
 
 
-;; >>>
-;; {:data2 80, :command :note-on, :channel 0, :msg #<FastShortMessage com.sun.media.sound.FastShortMessage@649c095e>, :note 71, :dev-key [:midi-device humatic MIDIHub Port 1 mnet MIDIHub Port 1 0], :status :note-on, :data1 71, :data2-f 0.62992126, :device {:description mnet MIDIHub Port 1, :vendor humatic, :sinks 0, :sources 2147483647, :name MIDIHub Port 1, :transmitter #<MidiInTransmitter com.sun.media.sound.MidiInDevice$MidiInTransmitter@38e7c679>, :overtone.studio.midi/full-device-key [:midi-device humatic MIDIHub Port 1 mnet MIDIHub Port 1 0], :info #<MidiInDeviceInfo MIDIHub Port 1>, :overtone.studio.midi/dev-num 0, :device #<MidiInDevice com.sun.media.sound.MidiInDevice@447fb905>, :version Unknown version}, :timestamp 328326376007, :velocity 80, :velocity-f 0.62992126}
-;; <<<
-;; !!!
-;; {:data2 0, :command :note-off, :channel 0, :msg #<FastShortMessage com.sun.media.sound.FastShortMessage@242e81c4>, :note 71, :dev-key [:midi-device humatic MIDIHub Port 1 mnet MIDIHub Port 1 0], :status :note-on, :data1 71, :data2-f 0.0, :device {:description mnet MIDIHub Port 1, :vendor humatic, :sinks 0, :sources 2147483647, :name MIDIHub Port 1, :transmitter #<MidiInTransmitter com.sun.media.sound.MidiInDevice$MidiInTransmitter@38e7c679>, :overtone.studio.midi/full-device-key [:midi-device humatic MIDIHub Port 1 mnet MIDIHub Port 1 0], :info #<MidiInDeviceInfo MIDIHub Port 1>, :overtone.studio.midi/dev-num 0, :device #<MidiInDevice com.sun.media.sound.MidiInDevice@447fb905>, :version Unknown version}, :timestamp 328327215408, :velocity 0, :velocity-f 0.0}
-;; !!!
-
-;; !!!
-;; {:data2 65, :command :pitch-bend, :channel 0, :msg #<FastShortMessage com.sun.media.sound.FastShortMessage@31bf070b>, :note 15, :dev-key [:midi-device humatic MIDIHub Port 1 mnet MIDIHub Port 1 0], :status :pitch-bend, :data1 15, :data2-f 0.511811, :device {:description mnet MIDIHub Port 1, :vendor humatic, :sinks 0, :sources 2147483647, :name MIDIHub Port 1, :transmitter #<MidiInTransmitter com.sun.media.sound.MidiInDevice$MidiInTransmitter@38e7c679>, :overtone.studio.midi/full-device-key [:midi-device humatic MIDIHub Port 1 mnet MIDIHub Port 1 0], :info #<MidiInDeviceInfo MIDIHub Port 1>, :overtone.studio.midi/dev-num 0, :device #<MidiInDevice com.sun.media.sound.MidiInDevice@447fb905>, :version Unknown version}, :timestamp 328430683670, :velocity 65, :velocity-f 0.511811}
-;; !!!
+(comment
+  (osc-listen server (fn [msg] (println msg)) :debug)
+  (osc-rm-listener server :debug)
+  ;; handle specific case--not very useful to me
+  (osc-handle server "/vkb_midi/0/note/64" (fn [msg] (println msg)))
+  (osc-rm-all-handlers server)
+  )
