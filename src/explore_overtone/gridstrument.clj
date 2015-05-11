@@ -35,7 +35,7 @@
       (ctl (nth eks channel) :gate 0))
     (do
       (reset! (nth eks-notes channel) note)
-      (ctl (nth eks channel) :note note :gate 1))))
+      (ctl (nth eks channel) :note note :gate 1 :amp (/ value 127.0)))))
 
 (defn grid-cc
   [channel note value]
@@ -52,11 +52,11 @@
     ;;(println "pitch" channel value norm-value)
     (ctl (nth eks channel) :note note)))
 
-;; not seeing this change much yet
 (defn grid-pressure
   [channel value]
-  (let [norm-value (/ value 4095.0)]
-    (println "pressure" channel value norm-value)))
+  (let [norm-value (/ value 127.0)]
+    ;;(println "pressure" channel value norm-value)
+    (ctl (nth eks channel) :amp (/ value 127.0))))
 
 (defn grid-unknown
   [msg]
